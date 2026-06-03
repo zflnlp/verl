@@ -26,7 +26,12 @@ from packaging import version
 from ray.actor import ActorHandle
 from vllm import SamplingParams
 from vllm.engine.arg_utils import AsyncEngineArgs
-from vllm.entrypoints.cli.serve import run_headless
+try:
+    from vllm.entrypoints.cli.serve import run_headless
+except ImportError:
+    # run_headless not available in older vllm versions (e.g., 0.8.x)
+    # For single-node training, this is not needed
+    run_headless = None
 from vllm.entrypoints.openai.api_server import build_app, init_app_state
 from vllm.inputs import TokensPrompt
 from vllm.lora.request import LoRARequest
@@ -432,6 +437,13 @@ class vLLMHttpServer:
 
     async def run_headless(self, args: argparse.Namespace):
         """Run headless server in a separate thread."""
+        if run_headless is None:
+            raise ImportError(
+                "run_headless is not available in your vllm version. "
+                "This is only needed for multi-node training. "
+                "For single-node training, please ensure node_rank == 0."
+            )
+
         args.api_server_count = 0
 
         def run_headless_wrapper():
