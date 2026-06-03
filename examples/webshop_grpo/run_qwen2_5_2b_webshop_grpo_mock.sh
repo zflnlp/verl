@@ -67,13 +67,17 @@ case "${DEVICE}" in
         ;;
 esac
 
+########################### data paths ###########################
+# Data directory - change this to your actual data path
+DATA_DIR=${DATA_DIR:-/workspace/data/webshop_test}
+
 ########################### parameter arrays ###########################
 
 DATA=(
     algorithm.adv_estimator=grpo
     algorithm.use_kl_in_reward=False
-    data.train_files="['$HOME/data/webshop/train.parquet']"
-    data.val_files="['$HOME/data/webshop/test.parquet']"
+    data.train_files="['${DATA_DIR}/train.parquet']"
+    data.val_files="['${DATA_DIR}/test.parquet']"
     data.train_batch_size=${train_batch_size}
     data.max_prompt_length=${max_prompt_length}
     data.max_response_length=${max_response_length}
