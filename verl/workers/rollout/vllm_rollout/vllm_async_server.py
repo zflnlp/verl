@@ -415,11 +415,13 @@ class vLLMHttpServer:
 
         engine_client = AsyncLLM.from_vllm_config(vllm_config=vllm_config, usage_context=usage_context, **kwargs)
 
-        # Don't keep the dummy data in memory
-        await engine_client.reset_mm_cache()
-        await engine_client.collective_rpc(
-            method="monkey_patch_model", kwargs={"vocab_size": len(self.model_config.tokenizer)}
-        )
+        # These methods are only available in newer vllm versions (>= 0.11.0)
+        if _VLLM_VERSION >= version.parse("0.11.0"):
+            # Don't keep the dummy data in memory
+            await engine_client.reset_mm_cache()
+            await engine_client.collective_rpc(
+                method="monkey_patch_model", kwargs={"vocab_size": len(self.model_config.tokenizer)}
+            )
 
         build_app_sig = inspect.signature(build_app)
         supported_tasks: tuple[Any, ...] = ()
