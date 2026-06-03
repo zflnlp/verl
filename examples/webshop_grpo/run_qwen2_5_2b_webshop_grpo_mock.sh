@@ -17,7 +17,7 @@ set -xeuo pipefail
 # Model configuration
 # For local models, use absolute path like: /root/.cache/modelscope/hub/models/Qwen/Qwen3-1.7B
 # For HuggingFace models, use: Qwen/Qwen3-1.7B
-MODEL_PATH=${MODEL_PATH:-/root/.cache/modelscope/hub/models/Qwen/Qwen3-1.7B}
+MODEL_PATH=${MODEL_PATH:-/workspace/models/Qwen3-1.7B}
 
 # Hardware configuration
 NNODES=${NNODES:-1}
@@ -164,10 +164,10 @@ echo "=========================================="
 # Pre-flight checks
 echo "Running pre-flight checks..."
 
-if [ ! -f "$HOME/data/webshop/train.parquet" ]; then
+if [ ! -f "${DATA_DIR}/train.parquet" ]; then
     echo "Generating mock training data..."
     python3 examples/webshop_grpo/data_preprocess.py \
-        --local_save_dir ~/data/webshop \
+        --local_save_dir ${DATA_DIR} \
         --num_tasks 100 \
         --seed 42
 fi
