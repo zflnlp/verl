@@ -147,7 +147,7 @@ TRAINER=(
     trainer.save_freq=${save_freq}
     trainer.test_freq=${test_freq}
     trainer.total_epochs=${total_epochs}
-    trainer.val_before_train=True
+    trainer.val_before_train=False
     trainer.val_only=False
 )
 
