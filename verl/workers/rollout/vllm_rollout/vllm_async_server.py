@@ -268,7 +268,6 @@ class vLLMHttpServer:
             "max_num_batched_tokens": self.config.max_num_batched_tokens,
             "enable_prefix_caching": self.config.enable_prefix_caching,
             "enable_sleep_mode": self.config.enable_sleep_mode,
-            "logprobs_mode": self.config.logprobs_mode,
             "enforce_eager": self.config.enforce_eager,
             "gpu_memory_utilization": self.config.gpu_memory_utilization,
             "disable_log_stats": self.config.disable_log_stats,
@@ -281,6 +280,10 @@ class vLLMHttpServer:
             "compilation_config": compilation_config,
             **engine_kwargs,
         }
+
+        # logprobs_mode is only supported in newer vllm versions (>= 0.11.0)
+        if _VLLM_VERSION >= version.parse("0.11.0"):
+            args["logprobs_mode"] = self.config.logprobs_mode
 
         # update profiler args
         profiler_args = build_vllm_profiler_args(
