@@ -1,0 +1,46 @@
+# WebShop Tool Configuration for verl GRPO Training
+#
+# This file defines the tools available for the WebShop shopping agent.
+# It is loaded by verl's tool system when specified in the training config:
+#   actor_rollout_ref.rollout.multi_turn.tool_config_path=examples/webshop_grpo/tool_config.yaml
+
+tools:
+  - name: webshop_search
+    description: Search for products in the online store
+    parameters:
+      type: object
+      properties:
+        query:
+          type: string
+          description: Search query for finding products (e.g., "red t-shirt size M")
+      required:
+        - query
+
+  - name: webshop_click
+    description: Click on a product or button in the store
+    parameters:
+      type: object
+      properties:
+        element:
+          type: string
+          description: Element to click (e.g., "1" for first product, "Buy Now", "Next")
+      required:
+        - element
+
+  - name: webshop_buy
+    description: Purchase the currently viewed product
+    parameters:
+      type: object
+      properties: {}
+
+  - name: webshop_get_status
+    description: Get current shopping session status
+    parameters:
+      type: object
+      properties: {}
+
+  - name: webshop_get_history
+    description: Get action history for this session
+    parameters:
+      type: object
+      properties: {}
