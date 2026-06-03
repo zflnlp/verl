@@ -442,8 +442,12 @@ class vLLMHttpServer:
             await init_app_state(engine_client, vllm_config, app.state, args)
         elif "supported_tasks" in init_app_sig.parameters:
             await init_app_state(engine_client, app.state, args, supported_tasks)
-        else:
+        elif len(init_app_sig.parameters) == 3:
+            # vllm 0.8.x: init_app_state(engine, state, args)
             await init_app_state(engine_client, app.state, args)
+        else:
+            # vllm 0.8.x alternative: init_app_state(engine, state)
+            await init_app_state(engine_client, app.state)
         if self.replica_rank == 0 and self.node_rank == 0:
             logger.info(f"Initializing a V1 LLM engine with config: {vllm_config}")
 
