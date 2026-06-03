@@ -441,6 +441,8 @@ class vLLMHttpServer:
         app = build_app(args, **build_app_kwargs)
 
         # Try different signatures for init_app_state across vllm versions
+        # In vllm 0.8.x, the second param is model_config (not vllm_config)
+        model_config = getattr(vllm_config, 'model_config', None) or getattr(engine_client, 'model_config', vllm_config)
         try:
             init_app_sig = inspect.signature(init_app_state)
             if "vllm_config" in init_app_sig.parameters:
@@ -449,12 +451,12 @@ class vLLMHttpServer:
                 await init_app_state(engine_client, app.state, args, supported_tasks)
             else:
                 await init_app_state(engine_client, app.state, args)
-        except TypeError:
-            # Fallback for vllm 0.8.x with different signatures
+        except (TypeError, AttributeError):
+            # Fallback for vllm 0.8.x: try with model_config instead of vllm_config
             try:
-                await init_app_state(engine_client, app.state, args)
+                await init_app_state(engine_client, model_config, app.state, args)
             except TypeError:
-                await init_app_state(engine_client, vllm_config, app.state, args)
+                await init_app_state(engine_client, app.state, args)
         if self.replica_rank == 0 and self.node_rank == 0:
             logger.info(f"Initializing a V1 LLM engine with config: {vllm_config}")
 
