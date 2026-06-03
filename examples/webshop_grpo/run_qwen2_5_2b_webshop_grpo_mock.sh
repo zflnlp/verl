@@ -44,7 +44,7 @@ rollout_tp=${ROLLOUT_TP:-1}
 rollout_gpu_mem_util=${ROLLOUT_GPU_MEM_UTIL:-0.5}
 
 # Training schedule
-total_epochs=${TOTAL_EPOCHS:-3}
+total_epochs=${TOTAL_EPOCHS:-1}
 save_freq=${SAVE_FREQ:-5}
 test_freq=${TEST_FREQ:-2}
 
