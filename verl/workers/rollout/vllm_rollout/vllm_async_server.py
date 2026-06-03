@@ -45,6 +45,8 @@ _VLLM_VERSION = version.parse(vllm.__version__)
 # Import AsyncLLM based on vllm version
 if _VLLM_VERSION >= version.parse("0.11.0"):
     from vllm.v1.engine.async_llm import AsyncLLM
+elif _VLLM_VERSION >= version.parse("0.8.0"):
+    from vllm.engine.async_llm_engine import AsyncLLMEngine as AsyncLLM
 else:
     from vllm.engine.async_llm import AsyncLLM
 
