@@ -210,12 +210,15 @@ class vLLMHttpServer:
         args: tuple = (),
         kwargs: dict[str, Any] | None = None,
     ):
-        await self.engine.collective_rpc(
-            method=method,
-            timeout=timeout,
-            args=args,
-            kwargs=kwargs,
-        )
+        if hasattr(self.engine, 'collective_rpc'):
+            await self.engine.collective_rpc(
+                method=method,
+                timeout=timeout,
+                args=args,
+                kwargs=kwargs,
+            )
+        else:
+            logger.warning(f"engine.collective_rpc not available, skipping method: {method}")
 
     async def launch_server(self, master_address: str = None, master_port: int = None, dp_rpc_port: int = None):
         if self.node_rank != 0:
@@ -437,17 +440,21 @@ class vLLMHttpServer:
             build_app_kwargs["model_config"] = engine_client.model_config
         app = build_app(args, **build_app_kwargs)
 
-        init_app_sig = inspect.signature(init_app_state)
-        if "vllm_config" in init_app_sig.parameters:
-            await init_app_state(engine_client, vllm_config, app.state, args)
-        elif "supported_tasks" in init_app_sig.parameters:
-            await init_app_state(engine_client, app.state, args, supported_tasks)
-        elif len(init_app_sig.parameters) == 3:
-            # vllm 0.8.x: init_app_state(engine, state, args)
-            await init_app_state(engine_client, app.state, args)
-        else:
-            # vllm 0.8.x alternative: init_app_state(engine, state)
-            await init_app_state(engine_client, app.state)
+        # Try different signatures for init_app_state across vllm versions
+        try:
+            init_app_sig = inspect.signature(init_app_state)
+            if "vllm_config" in init_app_sig.parameters:
+                await init_app_state(engine_client, vllm_config, app.state, args)
+            elif "supported_tasks" in init_app_sig.parameters:
+                await init_app_state(engine_client, app.state, args, supported_tasks)
+            else:
+                await init_app_state(engine_client, app.state, args)
+        except TypeError:
+            # Fallback for vllm 0.8.x with different signatures
+            try:
+                await init_app_state(engine_client, app.state, args)
+            except TypeError:
+                await init_app_state(engine_client, vllm_config, app.state, args)
         if self.replica_rank == 0 and self.node_rank == 0:
             logger.info(f"Initializing a V1 LLM engine with config: {vllm_config}")
 
@@ -555,7 +562,8 @@ class vLLMHttpServer:
         lora_request = None
         if self.lora_as_adapter:
             # Make sure we also check that the lora is already loaded in the engine
-            lora_loaded = VLLM_LORA_INT_ID in await self.engine.list_loras()
+            loras = await self.engine.list_loras() if hasattr(self.engine, 'list_loras') else []
+            lora_loaded = VLLM_LORA_INT_ID in loras
             if lora_loaded:
                 lora_request = LoRARequest(
                     lora_name=VLLM_LORA_NAME, lora_int_id=VLLM_LORA_INT_ID, lora_path=VLLM_LORA_PATH
@@ -637,19 +645,15 @@ class vLLMHttpServer:
             return
 
         if self.rollout_mode == RolloutMode.HYBRID:
-            # engine.wake_up() broadcasts via the DP coordinator to ALL EngineCore
-            # processes across all DP shards (unlike collective_rpc which only reaches
-            # TP workers within a single shard).
-            await self.engine.wake_up(tags=tags or self._get_wake_up_tags())
-            await self.engine.reset_prefix_cache(**_RESET_PREFIX_CACHE_KWARGS)
+            if hasattr(self.engine, 'wake_up'):
+                await self.engine.wake_up(tags=tags or self._get_wake_up_tags())
+            if hasattr(self.engine, 'reset_prefix_cache'):
+                await self.engine.reset_prefix_cache(**_RESET_PREFIX_CACHE_KWARGS)
         elif self.rollout_mode == RolloutMode.COLOCATED:
-            # Directly call engine to wake up without sync weights.
-            await self.engine.wake_up(tags=self._get_wake_up_tags())
-            # reset_connector=True drops any attached external KV store
-            # (e.g. MooncakeStoreConnector) whose entries were computed
-            # against the previous weights. No-op success when no connector
-            # is configured (vLLM scheduler treats it as such).
-            await self.engine.reset_prefix_cache(**_RESET_PREFIX_CACHE_KWARGS)
+            if hasattr(self.engine, 'wake_up'):
+                await self.engine.wake_up(tags=self._get_wake_up_tags())
+            if hasattr(self.engine, 'reset_prefix_cache'):
+                await self.engine.reset_prefix_cache(**_RESET_PREFIX_CACHE_KWARGS)
         elif self.rollout_mode == RolloutMode.STANDALONE:
             logger.info("skip wake_up in standalone mode")
 
@@ -660,17 +664,15 @@ class vLLMHttpServer:
         if self.rollout_mode == RolloutMode.HYBRID:
             await self._sleep_hybrid()
         elif self.rollout_mode == RolloutMode.COLOCATED:
-            await self.engine.sleep(level=1)
+            if hasattr(self.engine, 'sleep'):
+                await self.engine.sleep(level=1)
         elif self.rollout_mode == RolloutMode.STANDALONE:
             logger.info("skip sleep in standalone mode")
 
     async def clear_kv_cache(self):
         if self.node_rank == 0:
-            # reset_connector=True drops any attached external KV store
-            # (e.g. MooncakeStoreConnector) whose entries were computed
-            # against the previous model weights. With no connector it
-            # is a no-op success, so we can pass it unconditionally.
-            await self.engine.reset_prefix_cache(**_RESET_PREFIX_CACHE_KWARGS)
+            if hasattr(self.engine, 'reset_prefix_cache'):
+                await self.engine.reset_prefix_cache(**_RESET_PREFIX_CACHE_KWARGS)
 
             if _VLLM_VERSION >= version.parse("0.9.0"):
                 await self.engine.reset_mm_cache()
@@ -695,7 +697,8 @@ class vLLMHttpServer:
             and self.profiler_controller.check_this_rank()
             and self.profiler_controller.is_discrete_mode()
         ):
-            await self.engine.start_profile(**kwargs)
+            if hasattr(self.engine, 'start_profile'):
+                await self.engine.start_profile(**kwargs)
 
     async def stop_profile(self):
         if (
@@ -703,14 +706,16 @@ class vLLMHttpServer:
             and self.profiler_controller.check_this_rank()
             and self.profiler_controller.is_discrete_mode()
         ):
-            await self.engine.stop_profile()
+            if hasattr(self.engine, 'stop_profile'):
+                await self.engine.stop_profile()
 
     async def set_global_steps(self, global_steps: int):
         """Set the global steps of the model weights."""
         self.global_steps = global_steps
 
     async def wait_for_requests_to_drain(self):
-        await self.engine.wait_for_requests_to_drain()
+        if hasattr(self.engine, 'wait_for_requests_to_drain'):
+            await self.engine.wait_for_requests_to_drain()
 
     async def abort_all_requests(self, reset_prefix_cache: bool = True) -> dict[str, Any]:
         """Abort all ongoing generation requests.
@@ -980,8 +985,9 @@ class vLLMHttpServer:
             sleep_level = 1
         else:
             sleep_level = 2
-        await self.engine.sleep(level=sleep_level)
-        if _VLLM_VERSION >= version.parse("0.17.0"):
+        if hasattr(self.engine, 'sleep'):
+            await self.engine.sleep(level=sleep_level)
+        if _VLLM_VERSION >= version.parse("0.17.0") and hasattr(self.engine, 'reset_encoder_cache'):
             await self.engine.reset_encoder_cache()
 
 
