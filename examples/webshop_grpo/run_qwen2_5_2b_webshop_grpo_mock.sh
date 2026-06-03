@@ -89,7 +89,6 @@ MODEL=(
     actor_rollout_ref.model.path="$MODEL_PATH"
     actor_rollout_ref.model.use_remove_padding=True
     actor_rollout_ref.model.enable_gradient_checkpointing=True
-    actor_rollout_ref.model.attn_implementation=flash_attention_2
 )
 
 ACTOR=(
