@@ -21,7 +21,7 @@ MODEL_PATH=${MODEL_PATH:-/root/.cache/modelscope/hub/models/Qwen/Qwen3-1.7B}
 
 # Hardware configuration
 NNODES=${NNODES:-1}
-NGPUS_PER_NODE=${NGPUS_PER_NODE:-4}
+NGPUS_PER_NODE=${NGPUS_PER_NODE:-1}
 
 # Training hyperparameters (optimized for testing)
 train_batch_size=${TRAIN_BATCH_SIZE:-32}
