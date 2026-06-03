@@ -13,6 +13,9 @@
 
 set -xeuo pipefail
 
+# Force vllm to use V0 engine for compatibility with older versions
+export VLLM_USE_V1=0
+
 ########################### user-adjustable ###########################
 # Model configuration
 # For local models, use absolute path like: /root/.cache/modelscope/hub/models/Qwen/Qwen3-1.7B

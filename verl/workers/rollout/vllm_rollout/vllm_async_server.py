@@ -21,6 +21,7 @@ from pprint import pprint
 from typing import Any, Callable, Optional
 
 import ray
+import vllm
 import vllm.entrypoints.cli.serve
 from packaging import version
 from ray.actor import ActorHandle
@@ -37,7 +38,15 @@ from vllm.inputs import TokensPrompt
 from vllm.lora.request import LoRARequest
 from vllm.outputs import RequestOutput
 from vllm.usage.usage_lib import UsageContext
-from vllm.v1.engine.async_llm import AsyncLLM
+
+# Define vllm version early for conditional imports
+_VLLM_VERSION = version.parse(vllm.__version__)
+
+# Import AsyncLLM based on vllm version
+if _VLLM_VERSION >= version.parse("0.11.0"):
+    from vllm.v1.engine.async_llm import AsyncLLM
+else:
+    from vllm.engine.async_llm import AsyncLLM
 
 from verl.utils.config import omega_conf_to_dataclass
 from verl.utils.device import get_resource_name, get_visible_devices_keyword, is_torch_npu_available
@@ -58,7 +67,6 @@ from verl.workers.rollout.vllm_rollout.utils import (
     get_vllm_max_lora_rank,
 )
 
-_VLLM_VERSION = version.parse(vllm.__version__)
 _RESET_PREFIX_CACHE_KWARGS = {}
 if _VLLM_VERSION >= version.parse("0.13.0"):
     _RESET_PREFIX_CACHE_KWARGS["reset_connector"] = True
