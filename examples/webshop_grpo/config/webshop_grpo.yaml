@@ -6,6 +6,10 @@ defaults:
   - ppo_trainer
   - _self_
 
+custom_reward_function:
+  path: examples/webshop_grpo/reward_function.py
+  name: compute_score
+
 data:
   max_prompt_length: 1024
   max_response_length: 2048
