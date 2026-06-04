@@ -247,8 +247,6 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
             # Fall back to response_mask if loss_mask is not available (e.g., vllm rollout)
             if "loss_mask" in data.batch:
                 grpo_calculation_mask = data.batch["loss_mask"][:, -response_length:]
-            else:
-                logger.warning("loss_mask not found in batch, using response_mask for multi-turn GRPO")
         # Call compute_grpo_outcome_advantage with parameters matching its definition
         advantages, returns = core_algos.compute_grpo_outcome_advantage(
             token_level_rewards=data.batch["token_level_rewards"],
