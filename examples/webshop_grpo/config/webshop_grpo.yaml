@@ -11,9 +11,9 @@ custom_reward_function:
   name: compute_score
 
 data:
-  max_prompt_length: 512
-  max_response_length: 1024
-  train_batch_size: 16
+  max_prompt_length: 1024
+  max_response_length: 2048
+  train_batch_size: 32
   return_raw_chat: True
   filter_overlong_prompts: True
   truncation: 'error'
@@ -26,31 +26,30 @@ actor_rollout_ref:
   actor:
     optim:
       lr: 1e-6
-    ppo_mini_batch_size: 16
-    ppo_micro_batch_size_per_gpu: 4
+    ppo_mini_batch_size: 32
+    ppo_micro_batch_size_per_gpu: 8
     use_dynamic_bsz: True
     use_kl_loss: True
     kl_loss_coef: 0.001
     kl_loss_type: low_var_kl
     entropy_coeff: 0
     fsdp_config:
-      param_offload: True
-      optimizer_offload: True
+      param_offload: False
+      optimizer_offload: False
   rollout:
     name: vllm
     tensor_model_parallel_size: 1
-    gpu_memory_utilization: 0.4
-    n: 2
-    log_prob_micro_batch_size_per_gpu: 4
+    gpu_memory_utilization: 0.6
+    n: 4
+    log_prob_micro_batch_size_per_gpu: 8
     multi_turn:
       enable: True
-      max_assistant_turns: 10
+      max_assistant_turns: 15
       max_user_turns: 1
   ref:
-    log_prob_micro_batch_size_per_gpu: 4
+    log_prob_micro_batch_size_per_gpu: 8
     fsdp_config:
       param_offload: True
-      optimizer_offload: True
 
 algorithm:
   adv_estimator: grpo
