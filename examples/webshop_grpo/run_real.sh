@@ -74,6 +74,61 @@ interaction:
       max_steps: 20
 EOF
 
+# Create real tool config (use_mock=false)
+REAL_TOOL_CONFIG="${CONFIG_PATH}/webshop_tool_config_real.yaml"
+cat > ${REAL_TOOL_CONFIG} << EOF
+tools:
+  - class_name: "verl.tools.webshop_tool.WebShopTool"
+    config:
+      type: native
+      use_mock: false
+      webshop_server: "${WEBSHOP_SERVER}"
+    tool_schema:
+      type: "function"
+      function:
+        name: "search"
+        description: "Search for products in the WebShop store."
+        parameters:
+          type: "object"
+          properties:
+            query:
+              type: "string"
+              description: "The search query to find products"
+          required: ["query"]
+
+  - class_name: "verl.tools.webshop_tool.WebShopTool"
+    config:
+      type: native
+      use_mock: false
+      webshop_server: "${WEBSHOP_SERVER}"
+    tool_schema:
+      type: "function"
+      function:
+        name: "click"
+        description: "Click on a product or button in the WebShop interface."
+        parameters:
+          type: "object"
+          properties:
+            target:
+              type: "string"
+              description: "The item ID or button name to click (e.g., 'B001' or 'buy')"
+          required: ["target"]
+
+  - class_name: "verl.tools.webshop_tool.WebShopTool"
+    config:
+      type: native
+      use_mock: false
+      webshop_server: "${WEBSHOP_SERVER}"
+    tool_schema:
+      type: "function"
+      function:
+        name: "buy"
+        description: "Purchase the currently viewed product."
+        parameters:
+          type: "object"
+          properties: {}
+EOF
+
 echo "=========================================="
 echo "WebShop GRPO Training (Real Mode)"
 echo "=========================================="
@@ -103,7 +158,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.tensor_model_parallel_size=${ROLLOUT_TP} \
     actor_rollout_ref.rollout.gpu_memory_utilization=${ROLLOUT_GPU_MEM_UTIL} \
     actor_rollout_ref.rollout.n=${ROLLOUT_N} \
-    actor_rollout_ref.rollout.multi_turn.tool_config_path="${CONFIG_PATH}/webshop_tool_config.yaml" \
+    actor_rollout_ref.rollout.multi_turn.tool_config_path="${REAL_TOOL_CONFIG}" \
     actor_rollout_ref.rollout.multi_turn.interaction_config_path="${REAL_INTERACTION_CONFIG}" \
     trainer.project_name=${PROJECT_NAME} \
     trainer.experiment_name=${EXPERIMENT_NAME} \

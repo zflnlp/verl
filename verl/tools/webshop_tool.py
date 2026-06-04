@@ -32,6 +32,7 @@ class WebShopTool(BaseTool):
     def __init__(self, config: dict, tool_schema: dict = None):
         super().__init__(config, tool_schema)
         self.use_mock = config.get("use_mock", True)
+        self.webshop_server = config.get("webshop_server", "http://localhost:3000")
 
     async def execute(self, instance_id: str, tool_name: str, parameters: dict, **kwargs) -> Any:
         """Execute a WebShop tool function.
@@ -66,8 +67,7 @@ class WebShopTool(BaseTool):
         if self.use_mock:
             return self._mock_search(query)
         else:
-            # TODO: Connect to real WebShop server
-            return f"Searching for: {query}"
+            return await self._real_search(query)
 
     async def _click(self, instance_id: str, target: str) -> str:
         """Click on an item or button.
@@ -82,8 +82,7 @@ class WebShopTool(BaseTool):
         if self.use_mock:
             return self._mock_click(target)
         else:
-            # TODO: Connect to real WebShop server
-            return f"Clicked on: {target}"
+            return await self._real_click(target)
 
     async def _buy(self, instance_id: str) -> str:
         """Purchase the current item.
@@ -97,8 +96,85 @@ class WebShopTool(BaseTool):
         if self.use_mock:
             return "Purchase successful! Your order has been placed."
         else:
-            # TODO: Connect to real WebShop server
-            return "Purchase initiated."
+            return await self._real_buy()
+
+    async def _real_search(self, query: str) -> str:
+        """Search for products using the real WebShop server.
+
+        Args:
+            query: The search query.
+
+        Returns:
+            Search results from the server.
+        """
+        import aiohttp
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{self.webshop_server}/step",
+                    json={"action": "search", "query": query}
+                ) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        return data.get("observation", f"Search results for: {query}")
+                    else:
+                        return f"Error searching: {resp.status}"
+        except Exception as e:
+            logger.error(f"Search failed: {e}")
+            return f"Error: {str(e)}"
+
+    async def _real_click(self, target: str) -> str:
+        """Click on an item using the real WebShop server.
+
+        Args:
+            target: The item ID or button to click.
+
+        Returns:
+            The result of clicking.
+        """
+        import aiohttp
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{self.webshop_server}/step",
+                    json={"action": "click", "target": target}
+                ) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        return data.get("observation", f"Clicked on: {target}")
+                    else:
+                        return f"Error clicking: {resp.status}"
+        except Exception as e:
+            logger.error(f"Click failed: {e}")
+            return f"Error: {str(e)}"
+
+    async def _real_buy(self) -> str:
+        """Purchase the current item using the real WebShop server.
+
+        Args:
+            instance_id: The interaction instance ID.
+
+        Returns:
+            The result of the purchase.
+        """
+        import aiohttp
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{self.webshop_server}/step",
+                    json={"action": "buy"}
+                ) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        return data.get("observation", "Purchase completed!")
+                    else:
+                        return f"Error purchasing: {resp.status}"
+        except Exception as e:
+            logger.error(f"Purchase failed: {e}")
+            return f"Error: {str(e)}"
 
     def _mock_search(self, query: str) -> str:
         """Generate mock search results.

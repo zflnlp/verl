@@ -14,6 +14,7 @@
 
 import logging
 import os
+import re
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import uuid4
 
@@ -38,7 +39,7 @@ class WebShopInteraction(BaseInteraction):
     def __init__(self, config: dict):
         super().__init__(config)
         self._instance_dict = {}
-        self.webshop_server = config.get("webshop_server", None)
+        self.webshop_server = config.get("webshop_server", "http://localhost:3000")
         self.use_mock = config.get("use_mock", True)
         self.max_steps = config.get("max_steps", 15)
 
@@ -71,14 +72,25 @@ class WebShopInteraction(BaseInteraction):
             "reward": 0.0,
             "is_done": False,
             "num_steps": 0,
+            "task_id": ground_truth.get("task_id", "") if ground_truth else "",
         }
 
-        # Get initial observation
+        # Get initial observation from WebShop server
         if self.use_mock:
             self._instance_dict[instance_id]["current_observation"] = self._get_mock_initial_observation(ground_truth)
         else:
-            # TODO: Connect to real WebShop server
-            self._instance_dict[instance_id]["current_observation"] = "Welcome to WebShop!"
+            try:
+                import aiohttp
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(f"{self.webshop_server}/init") as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            self._instance_dict[instance_id]["current_observation"] = data.get("observation", "Welcome to WebShop!")
+                        else:
+                            self._instance_dict[instance_id]["current_observation"] = "Welcome to WebShop!"
+            except Exception as e:
+                logger.error(f"Failed to connect to WebShop server: {e}")
+                self._instance_dict[instance_id]["current_observation"] = "Welcome to WebShop! (server connection failed)"
 
         return instance_id
 
@@ -115,8 +127,7 @@ class WebShopInteraction(BaseInteraction):
         if self.use_mock:
             observation, reward, is_done = self._process_mock_action(action, instance)
         else:
-            # TODO: Send action to real WebShop server
-            observation, reward, is_done = "Action processed", 0.0, False
+            observation, reward, is_done = await self._process_real_action(action, instance)
 
         # Update instance state
         instance["steps"].append({"action": action, "observation": observation})
@@ -134,6 +145,60 @@ class WebShopInteraction(BaseInteraction):
             return True, observation, final_reward, {"num_steps": instance["num_steps"]}
         else:
             return False, observation, 0.0, {"num_steps": instance["num_steps"]}
+
+    async def _process_real_action(self, action: str, instance: dict) -> Tuple[str, float, bool]:
+        """Process an action using the real WebShop server.
+
+        Args:
+            action: The agent's action string.
+            instance: The interaction instance state.
+
+        Returns:
+            Tuple of (observation, reward, is_done).
+        """
+        import aiohttp
+
+        try:
+            # Parse the action
+            action_lower = action.lower().strip()
+
+            # Determine action type and parameters
+            if "search" in action_lower:
+                # Extract search query
+                match = re.search(r'search\[(.*?)\]', action, re.IGNORECASE)
+                query = match.group(1) if match else action
+                api_action = {"action": "search", "query": query}
+            elif "click" in action_lower:
+                # Extract click target
+                match = re.search(r'click\[(.*?)\]', action, re.IGNORECASE)
+                target = match.group(1) if match else action
+                api_action = {"action": "click", "target": target}
+            elif "buy" in action_lower or "purchase" in action_lower:
+                api_action = {"action": "buy"}
+            else:
+                # Default: treat as search
+                api_action = {"action": "search", "query": action}
+
+            # Send action to WebShop server
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{self.webshop_server}/step",
+                    json=api_action
+                ) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        observation = data.get("observation", "No observation returned")
+                        reward = data.get("reward", 0.0)
+                        is_done = data.get("done", False)
+                        return observation, reward, is_done
+                    else:
+                        error_text = await resp.text()
+                        logger.error(f"WebShop server error: {resp.status} - {error_text}")
+                        return f"Error: Server returned {resp.status}", 0.0, False
+
+        except Exception as e:
+            logger.error(f"Failed to process action: {e}")
+            return f"Error: {str(e)}", 0.0, False
 
     async def calculate_score(self, instance_id: str, **kwargs) -> float:
         """Calculate the reward score for the interaction.
