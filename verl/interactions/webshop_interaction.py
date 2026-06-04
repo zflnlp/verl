@@ -125,13 +125,16 @@ class WebShopInteraction(BaseInteraction):
 
         # Process the action
         if self.use_mock:
-            observation, reward, is_done = self._process_mock_action(action, instance)
+            raw_observation, reward, is_done = self._process_mock_action(action, instance)
         else:
-            observation, reward, is_done = await self._process_real_action(action, instance)
+            raw_observation, reward, is_done = await self._process_real_action(action, instance)
+
+        # Format observation in paper style
+        observation = self._format_observation(instance, raw_observation)
 
         # Update instance state
-        instance["steps"].append({"action": action, "observation": observation})
-        instance["current_observation"] = observation
+        instance["steps"].append({"action": action, "observation": raw_observation})
+        instance["current_observation"] = raw_observation
         instance["reward"] = reward
 
         # Check termination conditions
@@ -200,6 +203,53 @@ class WebShopInteraction(BaseInteraction):
             logger.error(f"Failed to process action: {e}")
             return f"Error: {str(e)}", 0.0, False
 
+    def _format_observation(self, instance: dict, raw_observation: str) -> str:
+        """Format observation in the paper's style.
+
+        Args:
+            instance: The interaction instance state.
+            raw_observation: The raw observation from the environment.
+
+        Returns:
+            Formatted observation string.
+        """
+        ground_truth = instance.get("ground_truth", {})
+        goal = ground_truth.get("goal", "a product")
+        step_count = instance.get("num_steps", 0)
+        steps = instance.get("steps", [])
+
+        # Build action history
+        history_length = min(3, len(steps))  # Show last 3 steps
+        history_lines = []
+        for i, step in enumerate(steps[-history_length:]):
+            action = step.get("action", "")
+            obs = step.get("observation", "")
+            history_lines.append(f"Step {step_count - history_length + i + 1}: Action: {action}")
+            history_lines.append(f"Observation: {obs[:200]}...")  # Truncate long observations
+
+        action_history = "\n".join(history_lines) if history_lines else "(no history)"
+
+        # Get available actions (mock or real)
+        if self.use_mock:
+            available_actions = "- search[<query>]: Search for products\n- click[<button name>]: Click on interactive elements\n- click[buy]: Purchase the current item"
+        else:
+            available_actions = "- search[<query>]: Search for products\n- click[<button name>]: Click on interactive elements"
+
+        return f"""You are an expert autonomous agent operating in the WebShop e-commerce environment.
+Your task is to: {goal}.
+
+Prior to this step, you have already taken {step_count - 1} step(s).
+Below are the most recent {history_length} observations and the corresponding actions you took:
+{action_history}
+
+You are now at step {step_count} and your current observation is:
+{raw_observation}
+
+Your admissible actions of the current situation are:
+{available_actions}
+
+Now it's your turn to take one action for the current step. You should first reason step-by-step about the current situation, then think carefully which admissible action best advances the shopping goal. This reasoning process MUST be enclosed within <thought> tags. Once you've finished your reasoning, you should choose an admissible action for current step and present it within <action> </action> tags."""
+
     async def calculate_score(self, instance_id: str, **kwargs) -> float:
         """Calculate the reward score for the interaction.
 
@@ -241,7 +291,21 @@ class WebShopInteraction(BaseInteraction):
             Mock observation string.
         """
         goal = ground_truth.get("goal", "a product") if ground_truth else "a product"
-        return f"Welcome to WebShop! Your task is to find and purchase {goal}.\n\nYou can use the following actions:\n- search[query]: Search for products\n- click[item_id]: View product details\n- click[buy]: Purchase the current product"
+        return f"""You are an expert autonomous agent operating in the WebShop e-commerce environment.
+Your task is to: {goal}.
+
+Prior to this step, you have already taken 0 step(s).
+Below are the most recent 0 observations and the corresponding actions you took:
+(no history)
+
+You are now at step 1 and your current observation is:
+Welcome to WebShop! You can search for products and browse listings.
+
+Your admissible actions of the current situation are:
+- search[<query>]: Search for products using a text query
+- click[<button name>]: Click on interactive elements (e.g., product links, filter buttons, pagination)
+
+Now it's your turn to take one action for the current step. You should first reason step-by-step about the current situation, then think carefully which admissible action best advances the shopping goal. This reasoning process MUST be enclosed within <thought> tags. Once you've finished your reasoning, you should choose an admissible action for current step and present it within <action> </action> tags."""
 
     def _process_mock_action(self, action: str, instance: dict) -> Tuple[str, float, bool]:
         """Process an action in mock mode.

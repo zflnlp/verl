@@ -147,20 +147,25 @@ def format_for_verl(tasks: list) -> pd.DataFrame:
 
     for task in tasks:
         # Create the prompt (user message)
-        prompt = f"""You are a shopping assistant. Your task is to help the user find and purchase a product.
+        prompt = f"""You are an expert autonomous agent operating in the WebShop e-commerce environment.
+Your task is to: {task['goal']}.
 
-Task: Find {task['goal']}
+Prior to this step, you have already taken 0 step(s).
+Below are the most recent 0 observations and the corresponding actions you took:
+(no history)
 
-You can use the following actions:
-- search[query]: Search for products
-- click[item_id]: View product details
-- click[buy]: Purchase the current product
+You are now at step 1 and your current observation is:
+Welcome to WebShop! You can search for products and browse listings.
 
-Please complete this task by searching for and purchasing the appropriate product."""
+Your admissible actions of the current situation are:
+- search[<query>]: Search for products using a text query
+- click[<button name>]: Click on interactive elements (e.g., product links, filter buttons, pagination)
+
+Now it's your turn to take one action for the current step. You should first reason step-by-step about the current situation, then think carefully which admissible action best advances the shopping goal. This reasoning process MUST be enclosed within <thought> tags. Once you've finished your reasoning, you should choose an admissible action for current step and present it within <action> </action> tags."""
 
         # Format as chat messages
         messages = [
-            {"role": "system", "content": "You are a helpful shopping assistant."},
+            {"role": "system", "content": "You are an expert autonomous agent operating in the WebShop e-commerce environment."},
             {"role": "user", "content": prompt},
         ]
 
