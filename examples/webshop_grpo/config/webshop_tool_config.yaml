@@ -1,0 +1,47 @@
+tools:
+  - class_name: "verl.tools.webshop_tool.WebShopTool"
+    config:
+      type: native
+      use_mock: true
+    tool_schema:
+      type: "function"
+      function:
+        name: "search"
+        description: "Search for products in the WebShop store."
+        parameters:
+          type: "object"
+          properties:
+            query:
+              type: "string"
+              description: "The search query to find products"
+          required: ["query"]
+
+  - class_name: "verl.tools.webshop_tool.WebShopTool"
+    config:
+      type: native
+      use_mock: true
+    tool_schema:
+      type: "function"
+      function:
+        name: "click"
+        description: "Click on a product or button in the WebShop interface."
+        parameters:
+          type: "object"
+          properties:
+            target:
+              type: "string"
+              description: "The item ID or button name to click (e.g., 'B001' or 'buy')"
+          required: ["target"]
+
+  - class_name: "verl.tools.webshop_tool.WebShopTool"
+    config:
+      type: native
+      use_mock: true
+    tool_schema:
+      type: "function"
+      function:
+        name: "buy"
+        description: "Purchase the currently viewed product."
+        parameters:
+          type: "object"
+          properties: {}
