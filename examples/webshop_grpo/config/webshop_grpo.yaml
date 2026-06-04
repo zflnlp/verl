@@ -37,7 +37,7 @@ actor_rollout_ref:
       param_offload: False
       optimizer_offload: False
   rollout:
-    name: vllm
+    name: sglang
     tensor_model_parallel_size: 1
     gpu_memory_utilization: 0.6
     n: 4
