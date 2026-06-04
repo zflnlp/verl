@@ -14,7 +14,7 @@ set -xeuo pipefail
 
 ########################### user-adjustable ###########################
 # Model configuration
-MODEL_PATH=${MODEL_PATH:-Qwen/Qwen2.5-0.5B-Instruct}
+MODEL_PATH=${MODEL_PATH:-/workspace/models/Qwen3-1.7B}
 
 # WebShop server configuration
 WEBSHOP_SERVER=${WEBSHOP_SERVER:-http://localhost:3000}
@@ -45,7 +45,7 @@ SAVE_FREQ=${SAVE_FREQ:-10}
 TEST_FREQ=${TEST_FREQ:-5}
 
 # Data configuration
-DATA_DIR=${DATA_DIR:-$HOME/data/webshop_real}
+DATA_DIR=${DATA_DIR:-/workspace/data/webshop_test}
 
 # Experiment tracking
 PROJECT_NAME=${PROJECT_NAME:-verl_grpo_webshop}
