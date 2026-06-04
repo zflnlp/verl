@@ -1,0 +1,5 @@
+interaction:
+  - class_name: "verl.interactions.scienceworld_interaction.ScienceWorldInteraction"
+    config:
+      use_mock: true
+      max_steps: 25
