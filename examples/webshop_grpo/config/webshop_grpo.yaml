@@ -43,8 +43,8 @@ actor_rollout_ref:
     n: 4
     log_prob_micro_batch_size_per_gpu: 8
     multi_turn:
-      enable: False
-      max_assistant_turns: 1
+      enable: True
+      max_assistant_turns: 15
       max_user_turns: 1
   ref:
     log_prob_micro_batch_size_per_gpu: 8
