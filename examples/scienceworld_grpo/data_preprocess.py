@@ -161,9 +161,16 @@ Now it's your turn to take one action for the current step. You should first rea
         ]
 
         data.append({
+            "data_source": "scienceworld",
             "prompt": messages,
+            "ability": "science",
             "reward_model": {
                 "ground_truth": task,
+            },
+            "extra_info": {
+                "task_name": task["task_name"],
+                "category": task["category"],
+                "difficulty": task["difficulty"],
             },
         })
 
