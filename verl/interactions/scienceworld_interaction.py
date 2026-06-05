@@ -104,7 +104,7 @@ class ScienceWorldInteraction(BaseInteraction):
                 task_name = gt.get("task_name", "boil")
                 variation = gt.get("variation", 0)
 
-                obs, info = env.load(task_name, variation)
+                env.load(task_name, variation)
                 instance["env"] = env
                 instance["current_observation"] = env.getObservation()
                 instance["possible_actions"] = env.getPossibleActions()

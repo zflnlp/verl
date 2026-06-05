@@ -76,9 +76,9 @@ Now it's your turn to take one action for the current step. You should first rea
 
 
 def run_episode(env, model, tokenizer, task_name: str, variation: int,
-                max_steps: int, task_description: str = None) -> dict:
+                max_steps: int, simplifications: str = "", task_description: str = None) -> dict:
     """Run a single episode and return results."""
-    obs, info = env.load(task_name, variation)
+    env.load(task_name, variation, simplificationStr=simplifications)
     task_desc = task_description or env.taskDescription()
 
     history = []
@@ -182,7 +182,7 @@ def main():
     # Initialize ScienceWorld
     print(f"Initializing ScienceWorld (task: {args.task_name})")
     simplifications = args.simplifications_preset if args.simplifications_preset != "none" else ""
-    env = ScienceWorldEnv(simplifications=simplifications)
+    env = ScienceWorldEnv()
 
     # Get available variations
     available_variations = env.getVariations(args.task_name)
@@ -198,7 +198,7 @@ def main():
         print(f"\n[{i+1}/{num_variations}] Running variation {variation}...")
 
         start_time = time.time()
-        result = run_episode(env, model, tokenizer, args.task_name, variation, args.max_steps)
+        result = run_episode(env, model, tokenizer, args.task_name, variation, args.max_steps, simplifications=simplifications)
         elapsed = time.time() - start_time
 
         result["elapsed_seconds"] = elapsed

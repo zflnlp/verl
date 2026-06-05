@@ -99,7 +99,7 @@ def generate_real_dataset(task_name: str, num_variations: int, seed: int) -> lis
         env = ScienceWorldEnv()
         for var_idx in range(num_variations):
             try:
-                obs, info = env.load(task_name, var_idx)
+                env.load(task_name, var_idx)
                 real_goals[var_idx] = env.taskDescription()
             except Exception as e:
                 print(f"Warning: Could not load variation {var_idx}: {e}")
