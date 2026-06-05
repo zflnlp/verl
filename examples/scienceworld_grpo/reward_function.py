@@ -13,6 +13,9 @@
 # limitations under the License.
 """
 Reward function for ScienceWorld GRPO training.
+
+In real mode, the environment provides the primary reward via tool_rewards.
+In mock mode or as fallback, we estimate reward from the agent's trajectory.
 """
 
 import re
@@ -30,35 +33,33 @@ def compute_score(
     Args:
         solution_str: The agent's final response or action sequence.
         ground_truth: Dictionary containing task information.
-        extra_info: Additional information.
+        extra_info: Additional information including tool_rewards.
 
     Returns:
         Reward score between 0.0 and 1.0.
     """
-    # Parse ground_truth if it's a string
     if isinstance(ground_truth, str):
         import json
         try:
             ground_truth = json.loads(ground_truth)
-        except:
+        except Exception:
             ground_truth = {}
 
-    # Extract tool rewards from extra_info if available
+    # Primary: use environment reward from tool_rewards if available
     tool_rewards = []
     if extra_info and "tool_rewards" in extra_info:
         tool_rewards = extra_info["tool_rewards"]
 
-    # If we have tool rewards, use them
     if tool_rewards:
         env_reward = tool_rewards[-1] if tool_rewards else 0.0
         return float(env_reward)
 
-    # Fallback: Parse the solution to estimate reward
+    # Fallback: estimate from trajectory
     return _parse_solution_reward(solution_str, ground_truth)
 
 
 def _parse_solution_reward(solution_str: str, ground_truth: dict) -> float:
-    """Parse the solution string to estimate reward.
+    """Estimate reward from the agent's solution trajectory.
 
     Args:
         solution_str: The agent's response text.
@@ -68,20 +69,18 @@ def _parse_solution_reward(solution_str: str, ground_truth: dict) -> float:
         Estimated reward score.
     """
     reward = 0.0
-    solution_lower = solution_str.lower()
 
     # Extract actions from <action> tags
     actions = re.findall(r'<action>\s*(.*?)\s*</action>', solution_str, re.IGNORECASE | re.DOTALL)
-    action_text = " ".join(actions).lower() if actions else solution_lower
+    action_text = " ".join(actions).lower() if actions else solution_str.lower()
 
-    # Reward for action diversity (different types of actions taken)
+    # Reward for action diversity
     action_types = set()
     action_keywords = ["look", "examine", "open", "take", "put", "use", "toggle", "pour", "mix", "go to"]
     for keyword in action_keywords:
         if keyword in action_text:
             action_types.add(keyword)
 
-    # Base reward for taking diverse actions
     if len(action_types) >= 5:
         reward += 0.4
     elif len(action_types) >= 3:
@@ -89,17 +88,19 @@ def _parse_solution_reward(solution_str: str, ground_truth: dict) -> float:
     elif len(action_types) >= 1:
         reward += 0.1
 
-    # Reward for completing task-related actions
+    # Reward for task-related actions
     task_name = ground_truth.get("task_name", "").lower()
     goal = ground_truth.get("goal", "").lower()
 
-    # Check for task-specific successful actions
     task_success_indicators = {
-        "boiling-water": ["boil", "temperature", "100"],
-        "growing-plants": ["water", "grow", "soil", "seed"],
+        "boil": ["boil", "temperature", "stove", "heat", "pot"],
+        "melt": ["melt", "heat", "temperature", "stove"],
+        "freeze": ["freeze", "cold", "ice", "temperature"],
+        "grow-plant": ["water", "grow", "soil", "seed", "plant"],
+        "find-living": ["find", "living", "animal", "plant"],
         "chemistry-mix": ["mix", "react", "combine", "chemical"],
-        "circuit-building": ["connect", "wire", "bulb", "light"],
-        "rock-identification": ["identify", "examine", "classify"],
+        "power-component": ["connect", "wire", "battery", "power"],
+        "test-conductivity": ["test", "conduct", "material"],
     }
 
     for task_key, indicators in task_success_indicators.items():
@@ -112,20 +113,19 @@ def _parse_solution_reward(solution_str: str, ground_truth: dict) -> float:
                 reward += 0.15
                 break
 
-    # Reward for scientific reasoning (checking for thought tags)
+    # Reward for reasoning (thought tags)
     thought_count = len(re.findall(r'<thought>', solution_str, re.IGNORECASE))
     if thought_count >= 3:
         reward += 0.2
     elif thought_count >= 1:
         reward += 0.1
 
-    # Penalty for too many repeated actions
+    # Penalty for repeated actions
     if actions:
-        # Count consecutive repeated actions
-        consecutive_repeats = 0
-        for i in range(1, len(actions)):
-            if actions[i].strip().lower() == actions[i-1].strip().lower():
-                consecutive_repeats += 1
+        consecutive_repeats = sum(
+            1 for i in range(1, len(actions))
+            if actions[i].strip().lower() == actions[i - 1].strip().lower()
+        )
         if consecutive_repeats > 3:
             reward -= 0.1
 
