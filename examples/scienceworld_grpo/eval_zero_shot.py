@@ -79,15 +79,16 @@ def run_episode(env, model, tokenizer, task_name: str, variation: int,
                 max_steps: int, simplifications: str = "", task_description: str = None) -> dict:
     """Run a single episode and return results."""
     env.load(task_name, variation, simplificationStr=simplifications)
-    task_desc = task_description or env.taskDescription()
+    task_desc = task_description or env.taskdescription()
 
     history = []
     total_reward = 0.0
+    last_score = 0.0
 
     for step in range(1, max_steps + 1):
         # Get current observation and possible actions
-        current_obs = env.getObservation()
-        possible_actions = env.getPossibleActions()
+        current_obs = env.look()
+        possible_actions = env.get_possible_actions()
 
         # Format prompt
         prompt = format_prompt(task_desc, step, history, current_obs, possible_actions)
@@ -118,19 +119,20 @@ def run_episode(env, model, tokenizer, task_name: str, variation: int,
 
         # Step environment
         obs, score, is_done, info = env.step(action)
+        last_score = info.get("score", score)
         total_reward = score / 100.0 if score > 1.0 else score
 
         history.append({
             "step": step,
             "action": action,
             "observation": obs,
-            "score": score,
+            "score": last_score,
         })
 
         if is_done:
             break
 
-    final_score = env.getScore()
+    final_score = last_score
     final_reward = final_score / 100.0 if final_score > 1.0 else final_score
 
     return {
@@ -185,7 +187,7 @@ def main():
     env = ScienceWorldEnv()
 
     # Get available variations
-    max_variations = env.getMaxVariations(args.task_name)
+    max_variations = env.get_max_variations(args.task_name)
     num_variations = min(args.num_variations, max_variations)
     print(f"Available variations: {max_variations}, testing: {num_variations}")
 

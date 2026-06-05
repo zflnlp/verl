@@ -100,7 +100,7 @@ def generate_real_dataset(task_name: str, num_variations: int, seed: int) -> lis
         for var_idx in range(num_variations):
             try:
                 env.load(task_name, var_idx)
-                real_goals[var_idx] = env.taskDescription()
+                real_goals[var_idx] = env.taskdescription()
             except Exception as e:
                 print(f"Warning: Could not load variation {var_idx}: {e}")
         del env

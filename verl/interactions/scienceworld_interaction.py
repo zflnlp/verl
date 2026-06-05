@@ -106,9 +106,9 @@ class ScienceWorldInteraction(BaseInteraction):
 
                 env.load(task_name, variation)
                 instance["env"] = env
-                instance["current_observation"] = env.getObservation()
-                instance["possible_actions"] = env.getPossibleActions()
-                instance["task_description"] = env.taskDescription()
+                instance["current_observation"] = env.look()
+                instance["possible_actions"] = env.get_possible_actions()
+                instance["task_description"] = env.taskdescription()
             except Exception as e:
                 logger.error(f"Failed to initialize ScienceWorld env: {e}")
                 instance["current_observation"] = f"Error initializing environment: {e}"
@@ -188,9 +188,11 @@ class ScienceWorldInteraction(BaseInteraction):
         try:
             obs, score, is_done, info = env.step(clean_action)
             # ScienceWorld score is 0-100, normalize to 0-1
+            raw_score = info.get("score", score)
+            instance["last_score"] = raw_score
             reward = score / 100.0 if score > 1.0 else score
             # Update possible actions for next turn
-            instance["possible_actions"] = env.getPossibleActions()
+            instance["possible_actions"] = env.get_possible_actions()
             return obs, reward, is_done
         except Exception as e:
             logger.error(f"ScienceWorld step error: {e}")
@@ -262,11 +264,8 @@ Now it's your turn to take one action for the current step. You should first rea
 
         # Use environment reward if available
         if not self.use_mock and instance.get("env") is not None:
-            try:
-                score = instance["env"].getScore()
-                return score / 100.0 if score > 1.0 else score
-            except Exception as e:
-                logger.error(f"Failed to get score: {e}")
+            score = instance.get("last_score", 0.0)
+            return score / 100.0 if score > 1.0 else score
 
         # Use accumulated reward
         if instance["reward"] > 0:
