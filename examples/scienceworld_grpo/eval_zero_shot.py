@@ -185,16 +185,16 @@ def main():
     env = ScienceWorldEnv()
 
     # Get available variations
-    available_variations = env.getVariations(args.task_name)
-    num_variations = min(args.num_variations, len(available_variations))
-    print(f"Available variations: {len(available_variations)}, testing: {num_variations}")
+    max_variations = env.getMaxVariations(args.task_name)
+    num_variations = min(args.num_variations, max_variations)
+    print(f"Available variations: {max_variations}, testing: {num_variations}")
 
     # Run evaluation
     results = []
     total_score = 0.0
 
     for i in range(num_variations):
-        variation = available_variations[i] if i < len(available_variations) else i
+        variation = i
         print(f"\n[{i+1}/{num_variations}] Running variation {variation}...")
 
         start_time = time.time()
