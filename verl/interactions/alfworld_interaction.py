@@ -39,6 +39,69 @@ def _extract_action(text: str) -> str:
     return text.strip()
 
 
+# Short name → (internal name, integer ID) mapping
+TASK_TYPE_MAP = {
+    "pick_and_place":           ("pick_and_place_simple", 1),
+    "look_at_obj_in_light":     ("look_at_obj_in_light", 2),
+    "pick_clean_then_place":    ("pick_clean_then_place_in_recep", 3),
+    "pick_heat_then_place":     ("pick_heat_then_place_in_recep", 4),
+    "pick_cool_then_place":     ("pick_cool_then_place_in_recep", 5),
+    "pick_two_obj":             ("pick_two_obj_and_place", 6),
+}
+
+
+def _build_alfworld_config(game_files_dir: str, task_type_ids: list, train_eval: str = "eval_out_of_distribution") -> dict:
+    """Build an ALFWorld config dict programmatically.
+
+    Args:
+        game_files_dir: Path to ALFWORLD_DATA directory (contains json_2.1.1/).
+        task_type_ids: List of integer task type IDs (1-6).
+        train_eval: One of 'train', 'eval_in_distribution', 'eval_out_of_distribution'.
+
+    Returns:
+        Config dict compatible with AlfredTWEnv.__init__.
+    """
+    data_root = game_files_dir.rstrip("/")
+    data_path_key = {
+        "train": "data_path",
+        "eval_in_distribution": "eval_id_data_path",
+        "eval_out_of_distribution": "eval_ood_data_path",
+    }.get(train_eval, "eval_ood_data_path")
+
+    config = {
+        "dataset": {
+            "data_path": f"{data_root}/json_2.1.1/train",
+            "eval_id_data_path": f"{data_root}/json_2.1.1/valid_seen",
+            "eval_ood_data_path": f"{data_root}/json_2.1.1/valid_unseen",
+            "num_train_games": -1,
+            "num_eval_games": -1,
+        },
+        "logic": {
+            "domain": f"{data_root}/logic/alfred.pddl",
+            "grammar": f"{data_root}/logic/alfred.twl2",
+        },
+        "env": {
+            "type": "AlfredTWEnv",
+            "domain_randomization": False,
+            "task_types": task_type_ids,
+            "expert_timeout_steps": 150,
+            "expert_type": "handcoded",
+            "goal_desc_human_anns_prob": 0.0,
+        },
+        "general": {
+            "random_seed": 42,
+            "use_cuda": True,
+            "task": "alfred",
+        },
+        "dagger": {
+            "training": {
+                "max_nb_steps_per_episode": 50,
+            },
+        },
+    }
+    return config
+
+
 class AlfworldInteraction(BaseInteraction):
     """Interaction class for ALFWorld benchmark.
 
@@ -48,17 +111,16 @@ class AlfworldInteraction(BaseInteraction):
     Supports two modes:
     - Mock mode: Simulated responses for pipeline testing.
     - Real mode: Direct ALFWorld Python API integration.
-    """
 
-    # ALFWorld task types
-    TASK_TYPES = [
-        "pick_and_place",
-        "pick_clean_then_place",
-        "pick_heat_then_place",
-        "pick_cool_then_place",
-        "look_at_obj_in_light",
-        "pick_two_obj",
-    ]
+    Config options:
+        use_mock: bool = True
+        max_steps: int = 30
+        game_files_dir: str — Path to ALFWORLD_DATA directory (contains json_2.1.1/)
+        config_path: str — Path to ALFWorld base_config.yaml (optional, overrides game_files_dir)
+        task_types: list[str] — Short task type names, e.g. ["pick_and_place", "pick_clean_then_place"]
+        train_eval: str = "eval_out_of_distribution"
+        num_games: int = -1 — Max number of games to load (-1 = all)
+    """
 
     def __init__(self, config: dict):
         super().__init__(config)
@@ -66,8 +128,33 @@ class AlfworldInteraction(BaseInteraction):
         self.use_mock = config.get("use_mock", True)
         self.max_steps = config.get("max_steps", 30)
         # Real mode config
+        self.config_path = config.get("config_path", "")
         self.game_files_dir = config.get("game_files_dir", "")
-        self.task_types = config.get("task_types", self.TASK_TYPES)
+        self.task_types = config.get("task_types", list(TASK_TYPE_MAP.keys()))
+        self.train_eval = config.get("train_eval", "eval_out_of_distribution")
+        self.num_games = config.get("num_games", -1)
+
+    def _load_alfworld_config(self) -> dict:
+        """Load or build the ALFWorld config dict."""
+        if self.config_path:
+            import yaml
+            with open(self.config_path) as f:
+                config = yaml.safe_load(f)
+            return config
+
+        # Build config from game_files_dir
+        task_type_ids = []
+        for short_name in self.task_types:
+            if short_name in TASK_TYPE_MAP:
+                _, tid = TASK_TYPE_MAP[short_name]
+                task_type_ids.append(tid)
+            else:
+                logger.warning(f"Unknown task type: {short_name}, skipping")
+
+        if not task_type_ids:
+            task_type_ids = [1, 2, 3, 4, 5, 6]
+
+        return _build_alfworld_config(self.game_files_dir, task_type_ids, self.train_eval)
 
     async def start_interaction(
         self,
@@ -82,7 +169,7 @@ class AlfworldInteraction(BaseInteraction):
             ground_truth: Dictionary containing task information:
                 - task_type: ALFWorld task type (e.g. "pick_and_place")
                 - goal: Task description
-                - game_file: Path to the .tw-pddl game file (real mode)
+                - game_file: Path to .tw-pddl game file (optional, for specific game)
 
         Returns:
             The instance ID for this interaction.
@@ -110,24 +197,30 @@ class AlfworldInteraction(BaseInteraction):
             instance["admissible_actions"] = self._get_mock_admissible_actions()
         else:
             try:
-                import alfworld
-                import alfworld.agents.environment
+                from alfworld.agents.environment import get_environment
 
-                env_class = alfworld.agents.environment.AlfredTWEnv
-                env = env_class(self.game_files_dir, train_eval="eval_out_of_distribution")
-                env = env.init_env(batch_size=1)
+                alfworld_config = self._load_alfworld_config()
+                env_type = alfworld_config["env"]["type"]
+                alfred_env = get_environment(env_type)(alfworld_config, train_eval=self.train_eval)
 
-                # Load specific game file if provided
+                # If a specific game file is requested, restrict game_files before init_env
                 game_file = gt.get("game_file", "")
-                if game_file:
-                    obs, info = env.reset(game_file=game_file)
-                else:
-                    obs, info = env.reset()
+                if game_file and os.path.exists(game_file):
+                    alfred_env.game_files = [game_file]
+                    alfred_env.num_games = 1
+
+                # Limit number of games if specified
+                if self.num_games > 0 and len(alfred_env.game_files) > self.num_games:
+                    alfred_env.game_files = alfred_env.game_files[:self.num_games]
+                    alfred_env.num_games = self.num_games
+
+                env = alfred_env.init_env(batch_size=1)
+                obs, info = env.reset()
 
                 instance["env"] = env
                 instance["current_observation"] = obs[0] if isinstance(obs, list) else obs
-                instance["admissible_actions"] = info.get("admissible_commands", [[]])[0] \
-                    if isinstance(info.get("admissible_commands"), list) else info.get("admissible_commands", [])
+                instance["admissible_actions"] = info["admissible_commands"][0] \
+                    if isinstance(info.get("admissible_commands"), list) else []
             except Exception as e:
                 logger.error(f"Failed to initialize ALFWorld env: {e}")
                 instance["current_observation"] = f"Error initializing environment: {e}"
@@ -205,19 +298,21 @@ class AlfworldInteraction(BaseInteraction):
         clean_action = _extract_action(action)
 
         try:
-            obs, reward, done, info = env.step([clean_action])
+            obs, scores, dones, infos = env.step([clean_action])
             observation = obs[0] if isinstance(obs, list) else obs
-            won = info.get("won", [False])[0] if isinstance(info.get("won"), list) else info.get("won", False)
+
+            # ALFWorld: scores are won values (1.0 or 0.0)
+            won = infos["won"][0] if isinstance(infos.get("won"), list) else infos.get("won", False)
             instance["won"] = won
 
-            # Update admissible actions
-            admissible = info.get("admissible_commands", [[]])[0] \
-                if isinstance(info.get("admissible_commands"), list) else info.get("admissible_commands", [])
+            # Update admissible actions for next turn
+            admissible = infos["admissible_commands"][0] \
+                if isinstance(infos.get("admissible_commands"), list) else []
             instance["admissible_actions"] = admissible
 
-            # ALFWorld reward is binary: 1.0 if won, 0.0 otherwise
+            # Binary reward from environment
             reward_val = 1.0 if won else 0.0
-            is_done = done[0] if isinstance(done, list) else done
+            is_done = dones[0] if isinstance(dones, list) else dones
 
             return observation, reward_val, is_done
         except Exception as e:
@@ -256,7 +351,7 @@ class AlfworldInteraction(BaseInteraction):
         if admissible_actions:
             available_actions = "\n".join(f"- {a}" for a in admissible_actions[:30])
         else:
-            available_actions = "- look\n- go to <location>\- take <object>\- put <object>"
+            available_actions = "- look\n- inventory\n- go to <location>\- take <object>"
 
         return f"""You are a household robot agent performing tasks in a simulated home environment.
 Your task is: {goal}
@@ -419,7 +514,7 @@ Now it's your turn to take one action for the current step. You should first rea
             obs = f"You arrive at {loc}. On the {loc} you see nothing special."
         elif "take" in clean_action:
             obs = "You pick up the object."
-        elif "put" in clean_action:
+        elif "put" in clean_action or "move" in clean_action:
             obs = "You put the object down."
         elif "open" in clean_action:
             obs = "You open the container. Inside, you see nothing."
@@ -437,6 +532,8 @@ Now it's your turn to take one action for the current step. You should first rea
             obs = "You cool the object in the fridge."
         elif "examine" in clean_action:
             obs = "You examine the object. It looks ordinary."
+        elif "slice" in clean_action:
+            obs = "You slice the object with the knife."
         else:
             obs = "You perform the action. The environment responds accordingly."
 
@@ -444,7 +541,7 @@ Now it's your turn to take one action for the current step. You should first rea
         action_set = set()
         for step in instance.get("steps", []):
             sa = _extract_action(step.get("action", "")).lower()
-            for kw in ["go to", "take", "put", "open", "close", "toggle", "use", "heat", "clean", "cool", "examine"]:
+            for kw in ["go to", "take", "put", "move", "open", "close", "toggle", "use", "heat", "clean", "cool", "examine", "slice"]:
                 if kw in sa:
                     action_set.add(kw)
 
@@ -482,7 +579,7 @@ Now it's your turn to take one action for the current step. You should first rea
         action_set = set()
         for step in steps:
             a = _extract_action(step.get("action", "")).lower()
-            for kw in ["go to", "take", "put", "open", "close", "toggle", "use", "heat", "clean", "cool", "examine", "look"]:
+            for kw in ["go to", "take", "put", "move", "open", "close", "toggle", "use", "heat", "clean", "cool", "examine", "look"]:
                 if kw in a:
                     action_set.add(kw)
 

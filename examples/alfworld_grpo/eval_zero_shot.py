@@ -15,11 +15,23 @@ Requirements:
 """
 
 import argparse
+import glob
 import json
 import os
 import re
 import time
 from datetime import datetime
+
+
+# Short name → (internal name, integer ID)
+TASK_TYPE_MAP = {
+    "pick_and_place":        ("pick_and_place_simple", 1),
+    "look_at_obj_in_light":  ("look_at_obj_in_light", 2),
+    "pick_clean_then_place": ("pick_clean_then_place_in_recep", 3),
+    "pick_heat_then_place":  ("pick_heat_then_place_in_recep", 4),
+    "pick_cool_then_place":  ("pick_cool_then_place_in_recep", 5),
+    "pick_two_obj":          ("pick_two_obj_and_place", 6),
+}
 
 
 def extract_action(text: str) -> str:
@@ -72,16 +84,62 @@ Your admissible actions of the current situation are:
 Now it's your turn to take one action for the current step. You should first reason step-by-step about the current situation, then think carefully which admissible action best advances the household task. This reasoning process MUST be enclosed within <thought> tags. Once you've finished your reasoning, you should choose an admissible action for current step and present it within <action> </action> tags."""
 
 
-def run_episode(env, model, tokenizer, max_steps: int, game_file: str = None) -> dict:
+def build_alfworld_config(alfworld_data_dir: str, task_type_ids: list) -> dict:
+    """Build an ALFWorld config dict for AlfredTWEnv."""
+    data_root = alfworld_data_dir.rstrip("/")
+    return {
+        "dataset": {
+            "data_path": f"{data_root}/json_2.1.1/train",
+            "eval_id_data_path": f"{data_root}/json_2.1.1/valid_seen",
+            "eval_ood_data_path": f"{data_root}/json_2.1.1/valid_unseen",
+            "num_train_games": -1,
+            "num_eval_games": -1,
+        },
+        "logic": {
+            "domain": f"{data_root}/logic/alfred.pddl",
+            "grammar": f"{data_root}/logic/alfred.twl2",
+        },
+        "env": {
+            "type": "AlfredTWEnv",
+            "domain_randomization": False,
+            "task_types": task_type_ids,
+            "expert_timeout_steps": 150,
+            "expert_type": "handcoded",
+            "goal_desc_human_anns_prob": 0.0,
+        },
+        "general": {
+            "random_seed": 42,
+            "use_cuda": True,
+            "task": "alfred",
+        },
+        "dagger": {
+            "training": {
+                "max_nb_steps_per_episode": 50,
+            },
+        },
+    }
+
+
+def make_single_game_env(config: dict, game_file: str, train_eval: str):
+    """Create an ALFWorld env initialized with a single specific game file."""
+    from alfworld.agents.environment import get_environment
+
+    env_type = config["env"]["type"]
+    alfred_env = get_environment(env_type)(config, train_eval=train_eval)
+    # Override game_files to contain only the target game
+    alfred_env.game_files = [game_file]
+    alfred_env.num_games = 1
+    env = alfred_env.init_env(batch_size=1)
+    return env
+
+
+def run_episode(env, model, tokenizer, max_steps: int) -> dict:
     """Run a single episode and return results."""
-    if game_file:
-        obs, info = env.reset(game_file=game_file)
-    else:
-        obs, info = env.reset()
+    obs, info = env.reset()
 
     observation = obs[0] if isinstance(obs, list) else obs
-    admissible_actions = info.get("admissible_commands", [[]])[0] \
-        if isinstance(info.get("admissible_commands"), list) else info.get("admissible_commands", [])
+    admissible_actions = info["admissible_commands"][0] \
+        if isinstance(info.get("admissible_commands"), list) else []
 
     # Extract goal from observation
     task_description = observation
@@ -119,14 +177,14 @@ def run_episode(env, model, tokenizer, max_steps: int, game_file: str = None) ->
         # Extract action
         action = extract_action(response)
 
-        # Step environment
-        obs, reward, done, info = env.step([action])
+        # Step environment: (obs, scores, dones, infos)
+        obs, scores, dones, infos = env.step([action])
         observation = obs[0] if isinstance(obs, list) else obs
-        admissible_actions = info.get("admissible_commands", [[]])[0] \
-            if isinstance(info.get("admissible_commands"), list) else info.get("admissible_commands", [])
+        admissible_actions = infos["admissible_commands"][0] \
+            if isinstance(infos.get("admissible_commands"), list) else []
 
-        won = info.get("won", [False])[0] if isinstance(info.get("won"), list) else info.get("won", False)
-        is_done = done[0] if isinstance(done, list) else done
+        won = infos["won"][0] if isinstance(infos.get("won"), list) else infos.get("won", False)
+        is_done = dones[0] if isinstance(dones, list) else dones
 
         history.append({
             "step": step,
@@ -150,15 +208,27 @@ def main():
     parser = argparse.ArgumentParser(description="Zero-shot evaluation on ALFWorld")
     parser.add_argument("--model_path", type=str, required=True, help="Path to the model")
     parser.add_argument("--task_type", type=str, default="pick_and_place",
-                        help="ALFWorld task type to evaluate")
+                        help="ALFWorld task type (short name: pick_and_place, pick_clean_then_place, etc.)")
     parser.add_argument("--num_games", type=int, default=10, help="Number of games to evaluate")
     parser.add_argument("--max_steps", type=int, default=30, help="Max steps per episode")
-    parser.add_argument("--alfworld_data_dir", type=str, default="/workspace/alfworld_data",
-                        help="Path to ALFWorld data directory")
+    parser.add_argument("--alfworld_data_dir", type=str, default=os.environ.get("ALFWORLD_DATA", "/workspace/alfworld_data"),
+                        help="Path to ALFWorld data directory (ALFWORLD_DATA)")
+    parser.add_argument("--train_eval", type=str, default="eval_out_of_distribution",
+                        choices=["train", "eval_in_distribution", "eval_out_of_distribution"],
+                        help="Which data split to use")
     parser.add_argument("--output_dir", type=str, default=None,
                         help="Directory to save results (default: auto)")
+    parser.add_argument("--tp_size", type=int, default=1, help="Tensor parallel size")
 
     args = parser.parse_args()
+
+    # Resolve task type
+    if args.task_type not in TASK_TYPE_MAP:
+        print(f"Unknown task type: {args.task_type}")
+        print(f"Available: {list(TASK_TYPE_MAP.keys())}")
+        return
+
+    internal_name, task_type_id = TASK_TYPE_MAP[args.task_type]
 
     # Setup output directory
     if args.output_dir is None:
@@ -182,40 +252,51 @@ def main():
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token_id = tokenizer.eos_token_id
 
-    # Initialize ALFWorld
-    print(f"Initializing ALFWorld (task type: {args.task_type})")
-    import alfworld
-    import alfworld.agents.environment
+    # Build ALFWorld config
+    print(f"Initializing ALFWorld (task type: {args.task_type} / {internal_name})")
+    alfworld_config = build_alfworld_config(args.alfworld_data_dir, [task_type_id])
 
-    env_class = alfworld.agents.environment.AlfredTWEnv
-    env = env_class(args.alfworld_data_dir, train_eval="eval_out_of_distribution")
-    env = env.init_env(batch_size=1)
+    # Discover game files for this task type
+    data_split = {
+        "train": "train",
+        "eval_in_distribution": "valid_seen",
+        "eval_out_of_distribution": "valid_unseen",
+    }[args.train_eval]
 
-    # Discover game files
-    import glob
-    pattern = os.path.join(args.alfworld_data_dir, "json_2.1.1", args.task_type, "*.json")
-    game_files = sorted(glob.glob(pattern))
+    game_dir = os.path.join(args.alfworld_data_dir, "json_2.1.1", data_split, internal_name)
+    game_files = sorted(glob.glob(os.path.join(game_dir, "**", "game.tw-pddl"), recursive=True))
+
     if not game_files:
-        pattern = os.path.join(args.alfworld_data_dir, args.task_type, "*.json")
-        game_files = sorted(glob.glob(pattern))
+        print(f"No game files found at: {game_dir}")
+        print("Make sure ALFWORLD_DATA is set correctly and game files are downloaded.")
+        return
 
-    num_games = min(args.num_games, len(game_files)) if game_files else args.num_games
+    num_games = min(args.num_games, len(game_files))
+    game_files = game_files[:num_games]
     print(f"Found {len(game_files)} game files, evaluating {num_games}")
 
     # Run evaluation
     results = []
     total_wins = 0
 
-    for i in range(num_games):
-        game_file = game_files[i] if game_files and i < len(game_files) else None
-        print(f"\n[{i+1}/{num_games}] Running game {i}...")
+    for i, game_file in enumerate(game_files):
+        print(f"\n[{i+1}/{num_games}] Running game: {os.path.basename(os.path.dirname(game_file))}")
 
         start_time = time.time()
-        result = run_episode(env, model, tokenizer, args.max_steps, game_file)
+
+        try:
+            # Create a fresh env for each game file
+            env = make_single_game_env(alfworld_config, game_file, args.train_eval)
+            result = run_episode(env, model, tokenizer, args.max_steps)
+            del env
+        except Exception as e:
+            print(f"  Error: {e}")
+            result = {"num_steps": 0, "won": False, "reward": 0.0, "history": [], "error": str(e)}
+
         elapsed = time.time() - start_time
 
         result["game_index"] = i
-        result["game_file"] = game_file or ""
+        result["game_file"] = game_file
         result["elapsed_seconds"] = elapsed
         results.append(result)
         total_wins += 1 if result["won"] else 0
@@ -226,7 +307,7 @@ def main():
     # Summary
     win_rate = total_wins / num_games if num_games > 0 else 0.0
     print(f"\n{'='*50}")
-    print(f"Task type: {args.task_type}")
+    print(f"Task type: {args.task_type} ({internal_name})")
     print(f"Games played: {num_games}")
     print(f"Wins: {total_wins}")
     print(f"Win rate: {win_rate:.3f}")
@@ -236,6 +317,7 @@ def main():
     summary = {
         "model_path": args.model_path,
         "task_type": args.task_type,
+        "task_type_internal": internal_name,
         "num_games": num_games,
         "max_steps": args.max_steps,
         "total_wins": total_wins,
@@ -249,9 +331,6 @@ def main():
         json.dump(summary, f, indent=2, default=str)
 
     print(f"\nResults saved to: {results_path}")
-
-    # Cleanup
-    del env
 
 
 if __name__ == "__main__":

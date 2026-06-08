@@ -21,25 +21,30 @@ echo "=========================================="
 echo "[Step 1/4] Installing alfworld package..."
 pip install alfworld[full] 2>&1 | tail -5
 
-# Step 2: Download game files
-echo "[Step 2/4] Downloading ALFWorld game files..."
-mkdir -p "${ALFWORLD_DATA_DIR}"
-alfworld-download --data "${ALFWORLD_DATA_DIR}" 2>&1 | tail -5
+# Step 2: Set ALFWORLD_DATA env var (used by alfworld-download and the config)
+export ALFWORLD_DATA="${ALFWORLD_DATA_DIR}"
+echo "export ALFWORLD_DATA=${ALFWORLD_DATA_DIR}" >> ~/.bashrc
 
-# Step 3: Set environment variable
-echo "[Step 3/4] Setting ALFROOT environment variable..."
-export ALFROOT="${ALFWORLD_DATA_DIR}"
-echo "export ALFROOT=${ALFWORLD_DATA_DIR}" >> ~/.bashrc
+# Step 3: Download game files
+echo "[Step 3/4] Downloading ALFWorld game files..."
+mkdir -p "${ALFWORLD_DATA_DIR}"
+alfworld-download 2>&1 | tail -5
 
 # Step 4: Verify installation
 echo "[Step 4/4] Verifying installation..."
 python3 -c "
+import os
 import alfworld
 import alfworld.agents.environment
-print(f'ALFWorld version: {alfworld.__version__ if hasattr(alfworld, \"__version__\") else \"installed\"}')
-print(f'Data directory: ${ALFWORLD_DATA_DIR}')
-import os
-assert os.path.exists('${ALFWORLD_DATA_DIR}'), 'Data directory not found!'
+data_dir = '${ALFWORLD_DATA_DIR}'
+print(f'ALFWorld installed OK')
+print(f'Data directory: {data_dir}')
+assert os.path.exists(data_dir), f'Data directory not found: {data_dir}'
+# Check for game files
+import glob
+games = glob.glob(os.path.join(data_dir, 'json_2.1.1', '**', 'game.tw-pddl'), recursive=True)
+print(f'Found {len(games)} game files')
+assert len(games) > 0, 'No game files found! Run alfworld-download first.'
 print('Verification: OK')
 "
 

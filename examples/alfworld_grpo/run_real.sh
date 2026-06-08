@@ -84,6 +84,8 @@ interaction:
         - pick_cool_then_place
         - look_at_obj_in_light
         - pick_two_obj
+      train_eval: eval_out_of_distribution
+      num_games: -1
 EOF
 
 cat > "${TMPCONF}/alfworld_tool_config.yaml" <<'EOF'

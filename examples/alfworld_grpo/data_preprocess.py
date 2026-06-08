@@ -38,6 +38,16 @@ import pandas as pd
 
 
 # ALFWorld task types with example goals
+# Keys are short names; internal_name is used for ALFWorld directory/ID lookup
+TASK_TYPE_MAP = {
+    "pick_and_place":        {"internal_name": "pick_and_place_simple",            "id": 1},
+    "look_at_obj_in_light":  {"internal_name": "look_at_obj_in_light",             "id": 2},
+    "pick_clean_then_place": {"internal_name": "pick_clean_then_place_in_recep",   "id": 3},
+    "pick_heat_then_place":  {"internal_name": "pick_heat_then_place_in_recep",    "id": 4},
+    "pick_cool_then_place":  {"internal_name": "pick_cool_then_place_in_recep",    "id": 5},
+    "pick_two_obj":          {"internal_name": "pick_two_obj_and_place",           "id": 6},
+}
+
 ALFWORLD_TASK_TYPES = {
     "pick_and_place": {
         "goals": [
@@ -153,47 +163,47 @@ def generate_real_dataset(task_type: str, num_games: int, seed: int, game_files_
         raise ValueError(f"Unknown task type: {task_type}. Available: {list(ALFWORLD_TASK_TYPES.keys())}")
 
     task_info = ALFWORLD_TASK_TYPES[task_type]
+    internal_name = TASK_TYPE_MAP[task_type]["internal_name"]
 
-    # Try to discover game files from ALFWorld data directory
+    # Discover game files from ALFWorld data directory
+    # Structure: $ALFWORLD_DATA/json_2.1.1/{train|valid_seen|valid_unseen}/{internal_name}/.../game.tw-pddl
     game_files = []
     if game_files_dir:
         import glob
-        pattern = os.path.join(game_files_dir, "json_2.1.1", task_type, "*.json")
-        game_files = sorted(glob.glob(pattern))
-        if not game_files:
-            # Try alternate path structure
-            pattern = os.path.join(game_files_dir, task_type, "*.json")
-            game_files = sorted(glob.glob(pattern))
+        for split in ["train", "valid_seen", "valid_unseen"]:
+            pattern = os.path.join(game_files_dir, "json_2.1.1", split, internal_name, "**", "game.tw-pddl")
+            found = sorted(glob.glob(pattern, recursive=True))
+            game_files.extend(found)
+        # Deduplicate
+        game_files = sorted(set(game_files))
 
     if not game_files:
-        print(f"Warning: No game files found for {task_type}, using predefined goals")
+        print(f"Warning: No game files found for {task_type} ({internal_name}), using predefined goals")
         num_games = min(num_games, len(task_info["goals"]))
 
     # Try to get real task descriptions from ALFWorld API
     real_goals = {}
     if game_files:
         try:
-            import alfworld
-            import alfworld.agents.environment
+            from alfworld.agents.environment import get_environment
 
-            env_class = alfworld.agents.environment.AlfredTWEnv
-            env = env_class(game_files_dir, train_eval="eval_out_of_distribution")
-            env = env.init_env(batch_size=1)
+            task_type_id = TASK_TYPE_MAP[task_type]["id"]
+            alfworld_config = _build_alfworld_config_simple(game_files_dir, [task_type_id])
 
             for i, gf in enumerate(game_files[:num_games]):
                 try:
-                    obs, info = env.reset(game_file=gf)
-                    # Extract goal from the observation or info
-                    if "extra_info" in info:
-                        real_goals[i] = info["extra_info"].get("goal", task_info["goals"][i % len(task_info["goals"])])
-                    else:
-                        # Parse goal from observation
-                        obs_text = obs[0] if isinstance(obs, list) else obs
-                        if "Your task is:" in obs_text:
-                            real_goals[i] = obs_text.split("Your task is:")[-1].strip().split("\n")[0]
+                    env_type = alfworld_config["env"]["type"]
+                    alfred_env = get_environment(env_type)(alfworld_config, train_eval="eval_out_of_distribution")
+                    alfred_env.game_files = [gf]
+                    alfred_env.num_games = 1
+                    env = alfred_env.init_env(batch_size=1)
+                    obs, info = env.reset()
+                    obs_text = obs[0] if isinstance(obs, list) else obs
+                    if "Your task is:" in obs_text:
+                        real_goals[i] = obs_text.split("Your task is:")[-1].strip().split("\n")[0]
+                    del env
                 except Exception as e:
                     print(f"Warning: Could not load game file {gf}: {e}")
-            del env
         except ImportError:
             print("Warning: alfworld package not installed, using default goals")
         except Exception as e:
@@ -216,6 +226,42 @@ def generate_real_dataset(task_type: str, num_games: int, seed: int, game_files_
         })
 
     return tasks
+
+
+def _build_alfworld_config_simple(game_files_dir: str, task_type_ids: list) -> dict:
+    """Build a minimal ALFWorld config dict for game file loading."""
+    data_root = game_files_dir.rstrip("/")
+    return {
+        "dataset": {
+            "data_path": f"{data_root}/json_2.1.1/train",
+            "eval_id_data_path": f"{data_root}/json_2.1.1/valid_seen",
+            "eval_ood_data_path": f"{data_root}/json_2.1.1/valid_unseen",
+            "num_train_games": -1,
+            "num_eval_games": -1,
+        },
+        "logic": {
+            "domain": f"{data_root}/logic/alfred.pddl",
+            "grammar": f"{data_root}/logic/alfred.twl2",
+        },
+        "env": {
+            "type": "AlfredTWEnv",
+            "domain_randomization": False,
+            "task_types": task_type_ids,
+            "expert_timeout_steps": 150,
+            "expert_type": "handcoded",
+            "goal_desc_human_anns_prob": 0.0,
+        },
+        "general": {
+            "random_seed": 42,
+            "use_cuda": True,
+            "task": "alfred",
+        },
+        "dagger": {
+            "training": {
+                "max_nb_steps_per_episode": 50,
+            },
+        },
+    }
 
 
 def format_for_verl(tasks: list) -> pd.DataFrame:
