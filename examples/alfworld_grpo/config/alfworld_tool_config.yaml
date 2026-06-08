@@ -1,0 +1,17 @@
+tools:
+  - class_name: "verl.tools.alfworld_tool.AlfworldTool"
+    config:
+      type: native
+      use_mock: true
+    tool_schema:
+      type: "function"
+      function:
+        name: "action"
+        description: "Execute an action in the ALFWorld household environment."
+        parameters:
+          type: "object"
+          properties:
+            command:
+              type: "string"
+              description: "The action command to execute (e.g., 'go to countertop 1', 'take apple from countertop 1', 'put apple in fridge 1', 'open fridge 1', 'clean apple 1', 'heat apple 1', 'cool apple 1')"
+          required: ["command"]
