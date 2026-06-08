@@ -1,9 +1,6 @@
 #!/bin/bash
 # Setup mock pyserini module for WebShop environment
 #
-# This script creates a mock pyserini module to avoid PyTorch version conflicts
-# when installing WebShop on the server.
-#
 # Usage:
 #   bash examples/webshop_grpo/setup_mock_pyserini.sh
 
@@ -23,9 +20,6 @@ echo "Creating mock pyserini directory structure..."
 mkdir -p $SITE_PACKAGES/pyserini/search/lucene
 mkdir -p $SITE_PACKAGES/pyserini/encode
 
-# Create __init__.py files
-echo "Creating mock pyserini module files..."
-
 # Main __init__.py
 cat > $SITE_PACKAGES/pyserini/__init__.py << 'PYEOF'
 """Mock pyserini module for WebShop environment."""
@@ -43,18 +37,14 @@ cat > $SITE_PACKAGES/pyserini/search/lucene/__init__.py << 'PYEOF'
 
 class MockHit:
     """Mock search hit object."""
-    def __init__(self, docid, score, content):
+    def __init__(self, docid, score, raw_json):
         self.docid = docid
         self.score = score
-        self.content = content
-        self.raw = content
+        self._raw = raw_json
 
-class MockDoc:
-    """Mock document object."""
-    def __init__(self, docid):
-        self.docid = docid
-        self.raw = f'{{"id": "{docid}", "title": "Mock Product", "description": "A mock product for testing", "price": "$29.99", "rating": "4.5/5.0"}}'
-        self.contents = f'Mock product {docid}'
+    def raw(self):
+        """Return raw JSON string (must be callable per WebShop engine)."""
+        return self._raw
 
 class LuceneSearcher:
     """Mock LuceneSearcher for WebShop."""
@@ -64,52 +54,48 @@ class LuceneSearcher:
         self._num_docs = 1000
 
     def search(self, query, k=10, *args, **kwargs):
-        """Return mock search results as objects."""
+        """Return mock search results as objects with callable raw()."""
         results = []
-        for i in range(min(k, 5)):
+        for i in range(min(k, 10)):
+            raw_json = '{{"id": "B{:03d}", "title": "Product {} for {}", "description": "A great product matching your search", "price": "${:.2f}", "rating": "{}/5.0"}}'.format(
+                i, i, query, 19.99 + i * 10, 4.0 + i * 0.1
+            )
             hit = MockHit(
-                docid=f'doc_{i}',
+                docid=f'B{i:03d}',
                 score=1.0 - (i * 0.1),
-                content=f'Mock document {i} for query: {query}'
+                raw_json=raw_json
             )
             results.append(hit)
         return results
 
     def doc(self, docid):
         """Return mock document by ID."""
-        return MockDoc(docid)
+        raw_json = '{{"id": "{}", "title": "Product {}", "description": "A great product", "price": "$29.99", "rating": "4.5/5.0"}}'.format(docid, docid)
+        return MockHit(docid=docid, score=1.0, raw_json=raw_json)
 
     def num_docs(self):
-        """Return number of documents."""
         return self._num_docs
 
     def close(self):
-        """Close the searcher."""
         pass
 PYEOF
 
-# encode __init__.py with JsonlCollectionIterator mock
+# encode __init__.py
 cat > $SITE_PACKAGES/pyserini/encode/__init__.py << 'PYEOF'
 """Mock pyserini encode module."""
 
 class JsonlCollectionIterator:
     """Mock JsonlCollectionIterator for WebShop."""
-
     def __init__(self, collection_path=None, *args, **kwargs):
         self.collection_path = collection_path
-
     def __iter__(self):
-        """Return empty iterator."""
         return iter([])
-
     def __len__(self):
-        """Return 0."""
         return 0
 PYEOF
 
 echo "Mock pyserini setup complete!"
 echo "Verifying installation..."
 python -c "import pyserini; print(f'pyserini version: {pyserini.__version__}')"
-python -c "from pyserini.search.lucene import LuceneSearcher; print('LuceneSearcher OK')"
-python -c "from pyserini.encode import JsonlCollectionIterator; print('JsonlCollectionIterator OK')"
+python -c "from pyserini.search.lucene import LuceneSearcher; s = LuceneSearcher('/tmp/test'); hits = s.search('test'); print(f'Hit docid: {hits[0].docid}, raw: {hits[0].raw()[:50]}...')"
 echo "All checks passed!"
