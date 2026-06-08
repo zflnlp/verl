@@ -41,6 +41,21 @@ PYEOF
 cat > $SITE_PACKAGES/pyserini/search/lucene/__init__.py << 'PYEOF'
 """Mock pyserini Lucene search module."""
 
+class MockHit:
+    """Mock search hit object."""
+    def __init__(self, docid, score, content):
+        self.docid = docid
+        self.score = score
+        self.content = content
+        self.raw = content
+
+class MockDoc:
+    """Mock document object."""
+    def __init__(self, docid):
+        self.docid = docid
+        self.raw = f'{{"id": "{docid}", "title": "Mock Product", "description": "A mock product for testing", "price": "$29.99", "rating": "4.5/5.0"}}'
+        self.contents = f'Mock product {docid}'
+
 class LuceneSearcher:
     """Mock LuceneSearcher for WebShop."""
 
@@ -49,24 +64,19 @@ class LuceneSearcher:
         self._num_docs = 1000
 
     def search(self, query, k=10, *args, **kwargs):
-        """Return mock search results."""
+        """Return mock search results as objects."""
         results = []
         for i in range(min(k, 5)):
-            result = {
-                'docid': f'doc_{i}',
-                'score': 1.0 - (i * 0.1),
-                'content': f'Mock document {i} for query: {query}',
-            }
-            results.append(result)
+            hit = MockHit(
+                docid=f'doc_{i}',
+                score=1.0 - (i * 0.1),
+                content=f'Mock document {i} for query: {query}'
+            )
+            results.append(hit)
         return results
 
     def doc(self, docid):
         """Return mock document by ID."""
-        class MockDoc:
-            def __init__(self, docid):
-                self.docid = docid
-                self.raw = f'{{"id": "{docid}", "title": "Mock Product", "description": "A mock product for testing", "price": "$29.99", "rating": "4.5/5.0"}}'
-                self.contents = f'Mock product {docid}'
         return MockDoc(docid)
 
     def num_docs(self):
