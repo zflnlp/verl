@@ -127,37 +127,16 @@ def format_for_verl(tasks: list) -> pd.DataFrame:
     data = []
 
     for task in tasks:
-        prompt = f"""You are an expert scientist working in a laboratory environment.
-Your task is: {task['goal']}.
-Task name: {task['task_name']}
-
+        prompt = f"""Your ScienceWorld task is: {task['goal']}.
 Prior to this step, you have already taken 0 step(s).
 Below are the most recent 0 observations and the corresponding actions you took:
 (no history)
-
 You are now at step 1 and your current observation is:
 You are in a well-equipped science laboratory. There are workbenches with various equipment, chemical supplies, and scientific instruments. A sink is available for water.
-
-Your admissible actions of the current situation are:
-- look around: Describe the current room and visible objects
-- examine <object>: Examine an object closely
-- open <object>: Open a container or door
-- close <object>: Close a container or door
-- take <object> from <location>: Pick up an object
-- put <object> in/on <location>: Place an object somewhere
-- use <object> [on <object>]: Use an object (optionally on another)
-- toggle <object>: Turn something on or off
-- pour <object> into <object>: Pour a liquid
-- mix <object>: Mix contents of a container
-- go to <location>: Move to a different location
-- look at <object>: Look at something specific
-- wait: Wait for something to happen
-- task: Describe the current task
-
-Now it's your turn to take one action for the current step. You should first reason step-by-step about the current situation, then think carefully which admissible action best advances the science task. This reasoning process MUST be enclosed within <thought> tags. Once you've finished your reasoning, you should choose an admissible action for current step and present it within <action> </action> tags."""
+Your valid actions of the current situation are: [look around, examine <object>, open <object>, close <object>, take <object> from <location>, put <object> in/on <location>, use <object> [on <object>], toggle <object>, pour <object> into <object>, mix <object>, go to <location>, look at <object>, wait, task].
+Now it's your turn to take an action. You should first reason step-by-step about the current situation. This reasoning process MUST be enclosed within <thought> tags. Once you've finished your reasoning, you should choose a valid action for the current step and present it within <action> </action> tags."""
 
         messages = [
-            {"role": "system", "content": "You are an expert scientist working in a laboratory environment."},
             {"role": "user", "content": prompt},
         ]
 

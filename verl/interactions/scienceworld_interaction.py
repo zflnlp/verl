@@ -228,25 +228,18 @@ class ScienceWorldInteraction(BaseInteraction):
         # Format available actions
         possible_actions = instance.get("possible_actions", [])
         if possible_actions:
-            available_actions = "\n".join(f"- {a}" for a in possible_actions[:30])
+            available_actions = ", ".join(possible_actions[:30])
         else:
-            available_actions = "- look around\n- examine <object>\- task"
+            available_actions = "look around, examine <object>, task"
 
-        return f"""You are an expert scientist working in a laboratory environment.
-Your task is: {goal}
-Task name: {task_name}
-
+        return f"""Your ScienceWorld task is: {goal}
 Prior to this step, you have already taken {step_count - 1} step(s).
 Below are the most recent {history_length} observations and the corresponding actions you took:
 {action_history}
-
 You are now at step {step_count} and your current observation is:
 {raw_observation}
-
-Your admissible actions of the current situation are:
-{available_actions}
-
-Now it's your turn to take one action for the current step. You should first reason step-by-step about the current situation, then think carefully which admissible action best advances the science task. This reasoning process MUST be enclosed within <thought> tags. Once you've finished your reasoning, you should choose an admissible action for current step and present it within <action> </action> tags."""
+Your valid actions of the current situation are: [{available_actions}].
+Now it's your turn to take an action. You should first reason step-by-step about the current situation. This reasoning process MUST be enclosed within <thought> tags. Once you've finished your reasoning, you should choose a valid action for the current step and present it within <action> </action> tags."""
 
     async def calculate_score(self, instance_id: str, **kwargs) -> float:
         """Calculate the reward score for the interaction.

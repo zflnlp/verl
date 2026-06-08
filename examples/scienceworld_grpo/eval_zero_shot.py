@@ -55,24 +55,18 @@ def format_prompt(task_description: str, step_count: int, history: list,
 
     # Format available actions
     if possible_actions:
-        available_actions = "\n".join(f"- {a}" for a in possible_actions[:30])
+        available_actions = ", ".join(possible_actions[:30])
     else:
-        available_actions = "- look around\n- task"
+        available_actions = "look around, task"
 
-    return f"""You are an expert scientist working in a laboratory environment.
-Your task is: {task_description}
-
+    return f"""Your ScienceWorld task is: {task_description}
 Prior to this step, you have already taken {step_count - 1} step(s).
 Below are the most recent {history_length} observations and the corresponding actions you took:
 {action_history}
-
 You are now at step {step_count} and your current observation is:
 {observation}
-
-Your admissible actions of the current situation are:
-{available_actions}
-
-Now it's your turn to take one action for the current step. You should first reason step-by-step about the current situation, then think carefully which admissible action best advances the science task. This reasoning process MUST be enclosed within <thought> tags. Once you've finished your reasoning, you should choose an admissible action for current step and present it within <action> </action> tags."""
+Your valid actions of the current situation are: [{available_actions}].
+Now it's your turn to take an action. You should first reason step-by-step about the current situation. This reasoning process MUST be enclosed within <thought> tags. Once you've finished your reasoning, you should choose a valid action for the current step and present it within <action> </action> tags."""
 
 
 def run_episode(env, model, tokenizer, task_name: str, variation: int,
@@ -95,7 +89,6 @@ def run_episode(env, model, tokenizer, task_name: str, variation: int,
 
         # Generate response
         messages = [
-            {"role": "system", "content": "You are an expert scientist working in a laboratory environment."},
             {"role": "user", "content": prompt},
         ]
 
