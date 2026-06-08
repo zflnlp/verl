@@ -2,9 +2,6 @@
 """
 Zero-shot evaluation of Qwen3-1.7B on WebShop.
 
-This script evaluates a language model on WebShop tasks without any training.
-The model is given a task description and must generate actions to complete it.
-
 Usage:
     python examples/webshop_grpo/evaluate_zero_shot.py \
         --model_path /workspace/models/Qwen3-1.7B \
@@ -39,7 +36,7 @@ def load_model(model_path: str, device: str = "auto"):
     return model, tokenizer
 
 
-def generate_action(model, tokenizer, prompt: str, max_new_tokens: int = 200) -> str:
+def generate_action(model, tokenizer, prompt: str, max_new_tokens: int = 300) -> str:
     """Generate an action given a prompt."""
     inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=2048)
     inputs = {k: v.to(model.device) for k, v in inputs.items()}
@@ -63,23 +60,28 @@ def parse_action(response: str) -> str:
     # Try to extract action from <action> tags
     action_match = re.search(r'<action>(.*?)</action>', response, re.IGNORECASE | re.DOTALL)
     if action_match:
-        return action_match.group(1).strip()
+        action = action_match.group(1).strip()
+        # Clean up the action
+        action = action.split('\n')[0].strip()
+        return action
 
     # Try to find action patterns
     patterns = [
-        r'search\[([^\]]+)\]',
-        r'click\[([^\]]+)\]',
-        r'buy',
+        (r'click\[buy\]', 'click[buy]'),
+        (r'buy', 'click[buy]'),
+        (r'search\[([^\]]+)\]', None),  # Will be handled specially
+        (r'click\[([^\]]+)\]', None),   # Will be handled specially
     ]
 
-    for pattern in patterns:
+    for pattern, replacement in patterns:
         match = re.search(pattern, response, re.IGNORECASE)
         if match:
+            if replacement:
+                return replacement
             return match.group(0)
 
-    # Default: return the last line
-    lines = response.strip().split('\n')
-    return lines[-1].strip() if lines else response
+    # Default: return empty string (will be handled as invalid action)
+    return ""
 
 
 def create_prompt(task_description: str, step_count: int, history: List[Dict], current_observation: str) -> str:
@@ -89,26 +91,37 @@ def create_prompt(task_description: str, step_count: int, history: List[Dict], c
     for i, h in enumerate(history[-3:]):  # Last 3 steps
         history_lines.append(f"Step {step_count - len(history[-3:]) + i + 1}:")
         history_lines.append(f"  Action: {h['action']}")
-        history_lines.append(f"  Result: {h['observation'][:100]}...")
+        history_lines.append(f"  Result: {h['observation'][:150]}")
 
     history_text = "\n".join(history_lines) if history_lines else "(no history)"
 
-    prompt = f"""You are an expert autonomous agent operating in the WebShop e-commerce environment.
-Your task is to: {task_description}
+    # Determine available actions based on current state
+    if step_count == 0:
+        available_actions = """Your available actions are:
+- search[<query>]: Search for products. Use SHORT keywords (2-5 words), NOT the full instruction.
+  Example: search[red dress size M]
+  Example: search[wireless headphones bluetooth]"""
+    else:
+        available_actions = """Your available actions are:
+- search[<query>]: Search for products. Use SHORT keywords (2-5 words).
+- click[<button>]: Click a product link or button. Use the exact text shown.
+- click[buy]: Purchase the currently viewed product (only when you see product details)."""
 
-Prior to this step, you have already taken {step_count} step(s).
-Below are the most recent {min(3, len(history))} observations and the corresponding actions you took:
+    prompt = f"""You are a shopping agent in an online store.
+
+Task: {task_description}
+
+{available_actions}
+
+Previous actions:
 {history_text}
 
-You are now at step {step_count + 1} and your current observation is:
-{current_observation}
+Current page:
+{current_observation[:800]}
 
-Your admissible actions of the current situation are:
-- search[<query>]: Search for products using a text query
-- click[<button name>]: Click on interactive elements (e.g., product links, filter buttons, pagination)
-- click[buy]: Purchase the current item
+What action should you take next? Choose ONE action from the available actions above.
 
-Now it's your turn to take one action for the current step. You should first reason step-by-step about the current situation, then think carefully which admissible action best advances the shopping goal. This reasoning process MUST be enclosed within <thought> tags. Once you've finished your reasoning, you should choose an admissible action for current step and present it within <action> </action> tags."""
+Action:"""
 
     return prompt
 
@@ -116,6 +129,11 @@ Now it's your turn to take one action for the current step. You should first rea
 def evaluate_episode(model, tokenizer, env, task_description: str, max_steps: int = 15) -> Tuple[float, List[Dict]]:
     """Evaluate a single episode."""
     obs = env.reset()
+    
+    # Extract task description from observation if needed
+    if isinstance(obs, tuple):
+        obs = obs[0] if isinstance(obs[0], str) else str(obs[0])
+    
     history = []
     total_reward = 0.0
 
@@ -127,25 +145,18 @@ def evaluate_episode(model, tokenizer, env, task_description: str, max_steps: in
         response = generate_action(model, tokenizer, prompt)
         action = parse_action(response)
 
+        # Skip empty actions
+        if not action:
+            action = "search[product]"
+
         # Execute action
         try:
-            if "search" in action.lower():
-                # Extract search query
-                match = re.search(r'search\[([^\]]+)\]', action, re.IGNORECASE)
-                query = match.group(1) if match else action
-                obs, reward, done, info = env.step(f"search[{query}]")
-            elif "click" in action.lower():
-                # Extract click target
-                match = re.search(r'click\[([^\]]+)\]', action, re.IGNORECASE)
-                target = match.group(1) if match else action
-                obs, reward, done, info = env.step(f"click[{target}]")
-            elif "buy" in action.lower():
-                obs, reward, done, info = env.step("buy")
-            else:
-                # Try to execute as-is
-                obs, reward, done, info = env.step(action)
+            obs, reward, done, info = env.step(action)
+            if isinstance(obs, tuple):
+                obs = obs[0] if isinstance(obs[0], str) else str(obs[0])
         except Exception as e:
-            print(f"Error executing action: {e}")
+            print(f"Error executing action '{action}': {e}")
+            obs = "Error: Invalid action"
             reward = 0.0
             done = False
 
@@ -153,7 +164,7 @@ def evaluate_episode(model, tokenizer, env, task_description: str, max_steps: in
         history.append({
             "step": step + 1,
             "action": action,
-            "observation": obs[:200],
+            "observation": obs[:300],
             "reward": reward,
         })
 
@@ -167,22 +178,14 @@ def evaluate_episode(model, tokenizer, env, task_description: str, max_steps: in
 
 def main():
     parser = argparse.ArgumentParser(description="Evaluate model on WebShop (zero-shot)")
-    parser.add_argument("--model_path", type=str, default="/workspace/models/Qwen3-1.7B",
-                        help="Path to the model")
-    parser.add_argument("--num_episodes", type=int, default=50,
-                        help="Number of episodes to evaluate")
-    parser.add_argument("--max_steps", type=int, default=15,
-                        help="Maximum steps per episode")
-    parser.add_argument("--num_products", type=int, default=1000,
-                        help="Number of products in WebShop")
-    parser.add_argument("--output_dir", type=str, default="results/webshop_zero_shot",
-                        help="Directory to save results")
-    parser.add_argument("--device", type=str, default="auto",
-                        help="Device to use (auto, cuda, cpu)")
-
+    parser.add_argument("--model_path", type=str, default="/workspace/models/Qwen3-1.7B")
+    parser.add_argument("--num_episodes", type=int, default=50)
+    parser.add_argument("--max_steps", type=int, default=15)
+    parser.add_argument("--num_products", type=int, default=1000)
+    parser.add_argument("--output_dir", type=str, default="results/webshop_zero_shot")
+    parser.add_argument("--device", type=str, default="auto")
     args = parser.parse_args()
 
-    # Create output directory
     os.makedirs(args.output_dir, exist_ok=True)
 
     # Load model
@@ -204,7 +207,17 @@ def main():
     for episode in tqdm(range(args.num_episodes)):
         # Get task description from environment
         obs = env.reset()
-        task_description = env.get_instruction() if hasattr(env, 'get_instruction') else "Find and purchase a product"
+        if isinstance(obs, tuple):
+            task_description = obs[1] if len(obs) > 1 and obs[1] else "Find and purchase a product"
+            obs = obs[0] if isinstance(obs[0], str) else str(obs[0])
+        else:
+            task_description = "Find and purchase a product"
+
+        # Extract task from observation if available
+        if "Instruction:" in obs:
+            match = re.search(r'Instruction:\s*(.*?)\[SEP\]', obs)
+            if match:
+                task_description = match.group(1).strip()
 
         # Evaluate episode
         reward, history = evaluate_episode(model, tokenizer, env, task_description, args.max_steps)
@@ -213,13 +226,15 @@ def main():
 
         if (episode + 1) % 10 == 0:
             avg_reward = sum(rewards) / len(rewards)
-            print(f"Episode {episode + 1}/{args.num_episodes}: Avg Reward = {avg_reward:.3f}")
+            nonzero = sum(1 for r in rewards if r > 0)
+            print(f"Episode {episode + 1}/{args.num_episodes}: Avg Reward = {avg_reward:.3f}, Non-zero = {nonzero}")
 
     # Calculate statistics
     avg_reward = sum(rewards) / len(rewards)
     max_reward = max(rewards)
     min_reward = min(rewards)
     success_rate = sum(1 for r in rewards if r > 0.5) / len(rewards)
+    nonzero_rate = sum(1 for r in rewards if r > 0) / len(rewards)
 
     print("\n" + "=" * 50)
     print("Evaluation Results")
@@ -228,6 +243,7 @@ def main():
     print(f"Average reward: {avg_reward:.3f}")
     print(f"Max reward: {max_reward:.3f}")
     print(f"Min reward: {min_reward:.3f}")
+    print(f"Non-zero reward rate: {nonzero_rate:.1%}")
     print(f"Success rate (reward > 0.5): {success_rate:.1%}")
     print("=" * 50)
 
@@ -240,6 +256,7 @@ def main():
         "avg_reward": avg_reward,
         "max_reward": max_reward,
         "min_reward": min_reward,
+        "nonzero_rate": nonzero_rate,
         "success_rate": success_rate,
         "rewards": rewards,
         "histories": all_histories,
