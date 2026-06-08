@@ -27,18 +27,18 @@ mkdir -p $SITE_PACKAGES/pyserini/encode
 echo "Creating mock pyserini module files..."
 
 # Main __init__.py
-cat > $SITE_PACKAGES/pyserini/__init__.py << 'EOF'
+cat > $SITE_PACKAGES/pyserini/__init__.py << 'PYEOF'
 """Mock pyserini module for WebShop environment."""
 __version__ = "0.0.0-mock"
-EOF
+PYEOF
 
 # search __init__.py
-cat > $SITE_PACKAGES/pyserini/search/__init__.py << 'EOF'
+cat > $SITE_PACKAGES/pyserini/search/__init__.py << 'PYEOF'
 """Mock pyserini search module."""
-EOF
+PYEOF
 
 # search/lucene __init__.py with LuceneSearcher mock
-cat > $SITE_PACKAGES/pyserini/search/lucene/__init__.py << 'EOF'
+cat > $SITE_PACKAGES/pyserini/search/lucene/__init__.py << 'PYEOF'
 """Mock pyserini Lucene search module."""
 
 class LuceneSearcher:
@@ -46,7 +46,7 @@ class LuceneSearcher:
 
     def __init__(self, index_dir=None, *args, **kwargs):
         self.index_dir = index_dir
-        self.num_docs = 1000
+        self._num_docs = 1000
 
     def search(self, query, k=10, *args, **kwargs):
         """Return mock search results."""
@@ -60,17 +60,26 @@ class LuceneSearcher:
             results.append(result)
         return results
 
+    def doc(self, docid):
+        """Return mock document by ID."""
+        class MockDoc:
+            def __init__(self, docid):
+                self.docid = docid
+                self.raw = f'{{"id": "{docid}", "title": "Mock Product", "description": "A mock product for testing", "price": "$29.99", "rating": "4.5/5.0"}}'
+                self.contents = f'Mock product {docid}'
+        return MockDoc(docid)
+
     def num_docs(self):
         """Return number of documents."""
-        return self.num_docs
+        return self._num_docs
 
     def close(self):
         """Close the searcher."""
         pass
-EOF
+PYEOF
 
 # encode __init__.py with JsonlCollectionIterator mock
-cat > $SITE_PACKAGES/pyserini/encode/__init__.py << 'EOF'
+cat > $SITE_PACKAGES/pyserini/encode/__init__.py << 'PYEOF'
 """Mock pyserini encode module."""
 
 class JsonlCollectionIterator:
@@ -86,7 +95,7 @@ class JsonlCollectionIterator:
     def __len__(self):
         """Return 0."""
         return 0
-EOF
+PYEOF
 
 echo "Mock pyserini setup complete!"
 echo "Verifying installation..."
