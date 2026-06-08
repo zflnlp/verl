@@ -36,7 +36,7 @@ def load_model(model_path: str, device: str = "auto"):
     return model, tokenizer
 
 
-def generate_action(model, tokenizer, prompt: str, max_new_tokens: int = 300) -> str:
+def generate_action(model, tokenizer, prompt: str, max_new_tokens: int = 500) -> str:
     """Generate an action given a prompt."""
     inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=2048)
     inputs = {k: v.to(model.device) for k, v in inputs.items()}
@@ -56,96 +56,132 @@ def generate_action(model, tokenizer, prompt: str, max_new_tokens: int = 300) ->
 
 
 def parse_action(response: str) -> str:
-    """Parse the action from the model's response."""
+    """Parse the action from the model's response.
+    
+    Expects format: <action>search[query]</action> or <action>click[button]</action>
+    """
     # Try to extract action from <action> tags
     action_match = re.search(r'<action>(.*?)</action>', response, re.IGNORECASE | re.DOTALL)
     if action_match:
         action = action_match.group(1).strip()
-        # Clean up the action
+        # Clean up: take only the first line
         action = action.split('\n')[0].strip()
-        return action
-
-    # Try to find action patterns
+        # Validate action format
+        if re.match(r'^(search|click)\[', action, re.IGNORECASE):
+            return action
+        # If it's just "buy", convert to click[buy]
+        if action.lower() == 'buy':
+            return 'click[buy]'
+    
+    # Fallback: try to find action patterns directly
     patterns = [
-        (r'click\[buy\]', 'click[buy]'),
-        (r'buy', 'click[buy]'),
-        (r'search\[([^\]]+)\]', None),  # Will be handled specially
-        (r'click\[([^\]]+)\]', None),   # Will be handled specially
+        r'(search\[[^\]]+\])',
+        r'(click\[[^\]]+\])',
     ]
-
-    for pattern, replacement in patterns:
+    for pattern in patterns:
         match = re.search(pattern, response, re.IGNORECASE)
         if match:
-            if replacement:
-                return replacement
-            return match.group(0)
-
-    # Default: return empty string (will be handled as invalid action)
+            return match.group(1)
+    
+    # Last resort: check for "buy" keyword
+    if 'buy' in response.lower():
+        return 'click[buy]'
+    
     return ""
 
 
 def create_prompt(task_description: str, step_count: int, history: List[Dict], current_observation: str) -> str:
-    """Create a prompt for the model."""
+    """Create a prompt following the paper's template."""
     # Build action history
+    history_length = min(3, len(history))
     history_lines = []
-    for i, h in enumerate(history[-3:]):  # Last 3 steps
-        history_lines.append(f"Step {step_count - len(history[-3:]) + i + 1}:")
-        history_lines.append(f"  Action: {h['action']}")
-        history_lines.append(f"  Result: {h['observation'][:150]}")
+    for i, h in enumerate(history[-history_length:]):
+        step_num = step_count - history_length + i + 1
+        history_lines.append(f"Step {step_num}: Action: {h['action']}")
+        obs_preview = h['observation'][:200] + "..." if len(h['observation']) > 200 else h['observation']
+        history_lines.append(f"Observation: {obs_preview}")
 
-    history_text = "\n".join(history_lines) if history_lines else "(no history)"
+    action_history = "\n".join(history_lines) if history_lines else "(no history)"
 
-    # Determine available actions based on current state
-    if step_count == 0:
-        available_actions = """Your available actions are:
-- search[<query>]: Search for products. Use SHORT keywords (2-5 words), NOT the full instruction.
-  Example: search[red dress size M]
-  Example: search[wireless headphones bluetooth]"""
-    else:
-        available_actions = """Your available actions are:
-- search[<query>]: Search for products. Use SHORT keywords (2-5 words).
-- click[<button>]: Click a product link or button. Use the exact text shown.
-- click[buy]: Purchase the currently viewed product (only when you see product details)."""
+    # Determine available actions based on current page
+    # WebShop typically has: search bar, product links, filter buttons, pagination, buy button
+    available_actions = _get_available_actions(current_observation)
 
-    prompt = f"""You are a shopping agent in an online store.
+    prompt = f"""You are an expert autonomous agent operating in the WebShop e-commerce environment. Your task is to: {task_description}.
 
-Task: {task_description}
+Prior to this step, you have already taken {step_count} step(s). Below are the most recent {history_length} observations and the corresponding actions you took:
+{action_history}
 
+You are now at step {step_count + 1} and your current observation is:
+{current_observation}
+
+Your admissible actions of the current situation are:
+[
 {available_actions}
+]
 
-Previous actions:
-{history_text}
-
-Current page:
-{current_observation[:800]}
-
-What action should you take next? Choose ONE action from the available actions above.
-
-Action:"""
+Now it's your turn to take one action for the current step. You should first reason step-by-step about the current situation, then think carefully which admissible action best advances the shopping goal. This reasoning process MUST be enclosed within <thought> tags. Once you've finished your reasoning, you should choose an admissible action for current step and present it within <action> </action> tags."""
 
     return prompt
+
+
+def _get_available_actions(observation: str) -> str:
+    """Extract available actions from the current observation."""
+    actions = []
+    
+    # Always include search if search bar is present (usually is)
+    actions.append('search[<query>]: Search for products using a text query')
+    
+    # Check for clickable elements in observation
+    # Product links usually appear as numbered items
+    if re.search(r'\[B\d+\]', observation) or re.search(r'ASIN:', observation):
+        actions.append('click[<product_id>]: Click on a product to view details')
+    
+    # Check for filter buttons
+    if 'Rating' in observation or 'Price' in observation or 'Brand' in observation:
+        actions.append('click[<filter>]: Click on a filter option')
+    
+    # Check for pagination
+    if 'Next' in observation or 'next' in observation:
+        actions.append('click[Next]: Go to next page')
+    if 'Prev' in observation or 'Previous' in observation:
+        actions.append('click[Prev]: Go to previous page')
+    
+    # Check for buy button (when viewing product details)
+    if 'buy' in observation.lower() or 'add to cart' in observation.lower():
+        actions.append('click[buy]: Purchase the current product')
+    
+    # If no specific actions detected, provide defaults
+    if len(actions) <= 1:
+        actions.append('click[<button>]: Click on interactive elements')
+    
+    return "\n".join(f"- {a}" for a in actions)
 
 
 def evaluate_episode(model, tokenizer, env, task_description: str, max_steps: int = 15) -> Tuple[float, List[Dict]]:
     """Evaluate a single episode."""
     obs = env.reset()
     
-    # Extract task description from observation if needed
+    # Handle tuple observation
     if isinstance(obs, tuple):
-        obs = obs[0] if isinstance(obs[0], str) else str(obs[0])
+        obs_text = obs[0] if isinstance(obs[0], str) else str(obs[0])
+    else:
+        obs_text = str(obs)
     
     history = []
     total_reward = 0.0
 
     for step in range(max_steps):
-        # Create prompt
-        prompt = create_prompt(task_description, step, history, obs)
+        # Create prompt following paper's template
+        prompt = create_prompt(task_description, step, history, obs_text)
 
-        # Generate action
+        # Generate response with thought and action
         response = generate_action(model, tokenizer, prompt)
+        
+        # Parse action from response
         action = parse_action(response)
 
-        # Skip empty actions
+        # Skip empty actions with a default
         if not action:
             action = "search[product]"
 
@@ -153,10 +189,12 @@ def evaluate_episode(model, tokenizer, env, task_description: str, max_steps: in
         try:
             obs, reward, done, info = env.step(action)
             if isinstance(obs, tuple):
-                obs = obs[0] if isinstance(obs[0], str) else str(obs[0])
+                obs_text = obs[0] if isinstance(obs[0], str) else str(obs[0])
+            else:
+                obs_text = str(obs)
         except Exception as e:
             print(f"Error executing action '{action}': {e}")
-            obs = "Error: Invalid action"
+            obs_text = "Error: Invalid action. Please try a different action."
             reward = 0.0
             done = False
 
@@ -164,7 +202,7 @@ def evaluate_episode(model, tokenizer, env, task_description: str, max_steps: in
         history.append({
             "step": step + 1,
             "action": action,
-            "observation": obs[:300],
+            "observation": obs_text[:300],
             "reward": reward,
         })
 
@@ -208,16 +246,24 @@ def main():
         # Get task description from environment
         obs = env.reset()
         if isinstance(obs, tuple):
-            task_description = obs[1] if len(obs) > 1 and obs[1] else "Find and purchase a product"
-            obs = obs[0] if isinstance(obs[0], str) else str(obs[0])
+            obs_text = obs[0] if isinstance(obs[0], str) else str(obs[0])
+            # Try to extract task from second element or from observation
+            if len(obs) > 1 and obs[1]:
+                task_description = str(obs[1])
+            else:
+                task_description = ""
         else:
-            task_description = "Find and purchase a product"
-
-        # Extract task from observation if available
-        if "Instruction:" in obs:
-            match = re.search(r'Instruction:\s*(.*?)\[SEP\]', obs)
+            obs_text = str(obs)
+            task_description = ""
+        
+        # Extract task from observation if not available
+        if not task_description and "Instruction:" in obs_text:
+            match = re.search(r'Instruction:\s*(.*?)\[SEP\]', obs_text)
             if match:
                 task_description = match.group(1).strip()
+        
+        if not task_description:
+            task_description = "Find and purchase a product that matches the given requirements"
 
         # Evaluate episode
         reward, history = evaluate_episode(model, tokenizer, env, task_description, args.max_steps)
