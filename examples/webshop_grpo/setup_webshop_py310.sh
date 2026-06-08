@@ -41,7 +41,7 @@ echo "Python version: $(python --version 2>&1)"
 echo ""
 echo "Step 3: Installing PyTorch with CUDA 11.8..."
 echo "This may take 5-10 minutes..."
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu118
 
 # Step 4: Install WebShop dependencies
 echo ""
