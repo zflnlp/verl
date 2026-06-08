@@ -4,7 +4,7 @@
 # This script:
 # 1. Removes old webshop environment (Python 3.8)
 # 2. Creates new webshop environment with Python 3.10
-# 3. Installs PyTorch with CUDA 12.4
+# 3. Installs PyTorch with CUDA 12.1
 # 4. Installs WebShop dependencies
 # 5. Installs transformers (supports Qwen3)
 # 6. Sets up mock pyserini
@@ -37,11 +37,11 @@ conda activate webshop
 
 echo "Python version: $(python --version 2>&1)"
 
-# Step 3: Install PyTorch with CUDA 12.4
+# Step 3: Install PyTorch with CUDA 12.1
 echo ""
-echo "Step 3: Installing PyTorch with CUDA 12.4..."
+echo "Step 3: Installing PyTorch with CUDA 12.1..."
 echo "This may take 5-10 minutes..."
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 
 # Step 4: Install WebShop dependencies
 echo ""
@@ -54,6 +54,7 @@ echo ""
 echo "Step 5: Fixing compatibility issues..."
 pip install werkzeug==2.3.7
 pip install flask==2.3.3
+pip install gym==0.23.1
 
 # Step 6: Install transformers (supports Qwen3)
 echo ""
@@ -61,22 +62,27 @@ echo "Step 6: Installing transformers (supports Qwen3)..."
 pip install transformers>=4.51.0
 pip install accelerate
 
-# Step 7: Add WebShop to Python path
+# Step 7: Download spacy model
 echo ""
-echo "Step 7: Adding WebShop to Python path..."
+echo "Step 7: Downloading spacy model..."
+python -m spacy download en_core_web_sm
+
+# Step 8: Add WebShop to Python path
+echo ""
+echo "Step 8: Adding WebShop to Python path..."
 SITE_PACKAGES=$(python -c "import site; print(site.getsitepackages()[0])")
 echo "/workspace/WebShop" > $SITE_PACKAGES/webshop.pth
 echo "Created $SITE_PACKAGES/webshop.pth"
 
-# Step 8: Setup mock pyserini
+# Step 9: Setup mock pyserini
 echo ""
-echo "Step 8: Setting up mock pyserini..."
+echo "Step 9: Setting up mock pyserini..."
 cd /workspace/verl
 bash examples/webshop_grpo/setup_mock_pyserini.sh
 
-# Step 9: Build search indexes
+# Step 10: Build search indexes
 echo ""
-echo "Step 9: Building search indexes..."
+echo "Step 10: Building search indexes..."
 cd /workspace/WebShop
 
 # Generate search engine resources
@@ -110,9 +116,9 @@ if [ -d "resources" ] && [ "$(ls -A resources 2>/dev/null)" ]; then
         2>/dev/null || echo "Note: Main index built (may use mock pyserini)"
 fi
 
-# Step 10: Verify installation
+# Step 11: Verify installation
 echo ""
-echo "Step 10: Verifying installation..."
+echo "Step 11: Verifying installation..."
 echo ""
 
 echo "1. Checking Python..."
