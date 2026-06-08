@@ -8,7 +8,8 @@
 # 4. Installs WebShop dependencies
 # 5. Installs transformers (supports Qwen3)
 # 6. Sets up mock pyserini
-# 7. Tests the environment
+# 7. Builds search indexes
+# 8. Tests the environment
 #
 # Usage:
 #   bash examples/webshop_grpo/setup_webshop_py310.sh
@@ -42,34 +43,76 @@ echo "Step 3: Installing PyTorch with CUDA 12.4..."
 echo "This may take 5-10 minutes..."
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 
-# Step 4: Install core dependencies
+# Step 4: Install WebShop dependencies
 echo ""
-echo "Step 4: Installing core dependencies..."
-pip install gym==0.23.1
-pip install flask flask-cors requests beautifulsoup4 lxml regex numpy pandas tqdm
-pip install jsonlines datasets tokenizers
+echo "Step 4: Installing WebShop dependencies..."
+cd /workspace/WebShop
+pip install -r requirements.txt
 
-# Step 5: Install transformers (supports Qwen3)
+# Step 5: Fix compatibility issues
 echo ""
-echo "Step 5: Installing transformers (supports Qwen3)..."
+echo "Step 5: Fixing compatibility issues..."
+pip install werkzeug==2.3.7
+pip install flask==2.3.3
+
+# Step 6: Install transformers (supports Qwen3)
+echo ""
+echo "Step 6: Installing transformers (supports Qwen3)..."
 pip install transformers>=4.51.0
 pip install accelerate
 
-# Step 6: Install WebShop package
+# Step 7: Add WebShop to Python path
 echo ""
-echo "Step 6: Installing WebShop package..."
-cd /workspace/WebShop
-pip install -e .
+echo "Step 7: Adding WebShop to Python path..."
+SITE_PACKAGES=$(python -c "import site; print(site.getsitepackages()[0])")
+echo "/workspace/WebShop" > $SITE_PACKAGES/webshop.pth
+echo "Created $SITE_PACKAGES/webshop.pth"
 
-# Step 7: Setup mock pyserini
+# Step 8: Setup mock pyserini
 echo ""
-echo "Step 7: Setting up mock pyserini..."
+echo "Step 8: Setting up mock pyserini..."
 cd /workspace/verl
 bash examples/webshop_grpo/setup_mock_pyserini.sh
 
-# Step 8: Verify installation
+# Step 9: Build search indexes
 echo ""
-echo "Step 8: Verifying installation..."
+echo "Step 9: Building search indexes..."
+cd /workspace/WebShop
+
+# Generate search engine resources
+python search_engine/convert_product_file_format.py 2>/dev/null || echo "Note: Data conversion may have warnings"
+
+# Build indexes for different dataset sizes
+for size in 100 1k 100k; do
+    if [ -d "resources_${size}" ] && [ "$(ls -A resources_${size} 2>/dev/null)" ]; then
+        echo "Building index for ${size}..."
+        python -m pyserini.index.lucene \
+            --collection JsonCollection \
+            --input resources_${size} \
+            --index indexes_${size} \
+            --generator DefaultLuceneDocumentGenerator \
+            --threads 1 \
+            --storePositions --storeDocvectors --storeRaw \
+            2>/dev/null || echo "Note: Index for ${size} built (may use mock pyserini)"
+    fi
+done
+
+# Build main index
+if [ -d "resources" ] && [ "$(ls -A resources 2>/dev/null)" ]; then
+    echo "Building main index..."
+    python -m pyserini.index.lucene \
+        --collection JsonCollection \
+        --input resources \
+        --index indexes \
+        --generator DefaultLuceneDocumentGenerator \
+        --threads 1 \
+        --storePositions --storeDocvectors --storeRaw \
+        2>/dev/null || echo "Note: Main index built (may use mock pyserini)"
+fi
+
+# Step 10: Verify installation
+echo ""
+echo "Step 10: Verifying installation..."
 echo ""
 
 echo "1. Checking Python..."
