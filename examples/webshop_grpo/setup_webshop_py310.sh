@@ -4,7 +4,7 @@
 # This script:
 # 1. Removes old webshop environment (Python 3.8)
 # 2. Creates new webshop environment with Python 3.10
-# 3. Installs PyTorch with CUDA 12.1
+# 3. Installs PyTorch with CUDA 11.8
 # 4. Installs WebShop dependencies
 # 5. Installs transformers (supports Qwen3)
 # 6. Sets up mock pyserini
@@ -37,11 +37,11 @@ conda activate webshop
 
 echo "Python version: $(python --version 2>&1)"
 
-# Step 3: Install PyTorch with CUDA 12.1
+# Step 3: Install PyTorch with CUDA 11.8
 echo ""
-echo "Step 3: Installing PyTorch with CUDA 12.1..."
+echo "Step 3: Installing PyTorch with CUDA 11.8..."
 echo "This may take 5-10 minutes..."
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 
 # Step 4: Install WebShop dependencies
 echo ""
@@ -65,7 +65,7 @@ pip install accelerate
 # Step 7: Download spacy model
 echo ""
 echo "Step 7: Downloading spacy model..."
-python -m spacy download en_core_web_sm
+pip install en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1.tar.gz
 
 # Step 8: Add WebShop to Python path
 echo ""
