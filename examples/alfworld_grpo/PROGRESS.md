@@ -1,8 +1,8 @@
 # ALFWorld GRPO 项目进度
 
-## 当前状态：Mock 训练就绪，等待 GPU 空闲
+## 当前状态：Zero-shot 验证通过，Mock 训练等待 GPU 空闲
 
-最后更新：2026-06-09
+最后更新：2026-06-09 (updated)
 
 ---
 
