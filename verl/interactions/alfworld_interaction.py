@@ -92,6 +92,7 @@ def _build_alfworld_config(game_files_dir: str, task_type_ids: list, train_eval:
             "random_seed": 42,
             "use_cuda": True,
             "task": "alfred",
+            "training_method": "dagger",
         },
         "dagger": {
             "training": {

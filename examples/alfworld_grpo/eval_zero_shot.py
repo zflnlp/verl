@@ -111,6 +111,7 @@ def build_alfworld_config(alfworld_data_dir: str, task_type_ids: list) -> dict:
             "random_seed": 42,
             "use_cuda": True,
             "task": "alfred",
+            "training_method": "dagger",
         },
         "dagger": {
             "training": {
