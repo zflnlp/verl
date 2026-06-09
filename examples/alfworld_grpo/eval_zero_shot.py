@@ -185,7 +185,7 @@ def run_episode(env, model, tokenizer, max_steps: int) -> dict:
             if isinstance(infos.get("admissible_commands"), list) else []
 
         won = infos["won"][0] if isinstance(infos.get("won"), list) else infos.get("won", False)
-        is_done = dones[0] if isinstance(dones, list) else dones
+        is_done = dones[0] if isinstance(dones, (list, tuple)) else dones
 
         history.append({
             "step": step,

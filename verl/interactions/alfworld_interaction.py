@@ -313,7 +313,7 @@ class AlfworldInteraction(BaseInteraction):
 
             # Binary reward from environment
             reward_val = 1.0 if won else 0.0
-            is_done = dones[0] if isinstance(dones, list) else dones
+            is_done = dones[0] if isinstance(dones, (list, tuple)) else dones
 
             return observation, reward_val, is_done
         except Exception as e:
