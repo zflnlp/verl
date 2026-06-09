@@ -10,7 +10,7 @@ Usage:
         --max_steps 30
 
 Requirements:
-    pip install alfworld[full] transformers torch
+    pip install alfworld[full] transformers torch accelerate
     alfworld-download
 """
 
@@ -212,7 +212,7 @@ def main():
                         help="ALFWorld task type (short name: pick_and_place, pick_clean_then_place, etc.)")
     parser.add_argument("--num_games", type=int, default=10, help="Number of games to evaluate")
     parser.add_argument("--max_steps", type=int, default=30, help="Max steps per episode")
-    parser.add_argument("--alfworld_data_dir", type=str, default=os.environ.get("ALFWORLD_DATA", "/workspace/alfworld_data"),
+    parser.add_argument("--alfworld_data_dir", type=str, default=os.environ.get("ALFWORLD_DATA", "/workspace/data/alf_data"),
                         help="Path to ALFWorld data directory (ALFWORLD_DATA)")
     parser.add_argument("--train_eval", type=str, default="eval_out_of_distribution",
                         choices=["train", "eval_in_distribution", "eval_out_of_distribution"],
@@ -258,17 +258,24 @@ def main():
     alfworld_config = build_alfworld_config(args.alfworld_data_dir, [task_type_id])
 
     # Discover game files for this task type
+    # ALFWorld directory structure is FLAT: each game is a dir named like
+    # pick_and_place_simple-SaltShaker-None-Drawer-10 directly under the split dir
     data_split = {
         "train": "train",
         "eval_in_distribution": "valid_seen",
         "eval_out_of_distribution": "valid_unseen",
     }[args.train_eval]
 
-    game_dir = os.path.join(args.alfworld_data_dir, "json_2.1.1", data_split, internal_name)
-    game_files = sorted(glob.glob(os.path.join(game_dir, "**", "game.tw-pddl"), recursive=True))
+    split_dir = os.path.join(args.alfworld_data_dir, "json_2.1.1", data_split)
+    all_game_dirs = sorted(glob.glob(os.path.join(split_dir, internal_name + "-*")))
+    game_files = []
+    for d in all_game_dirs:
+        gf = os.path.join(d, "game.tw-pddl")
+        if os.path.exists(gf):
+            game_files.append(gf)
 
     if not game_files:
-        print(f"No game files found at: {game_dir}")
+        print(f"No game files found at: {split_dir}/{internal_name}-*")
         print("Make sure ALFWORLD_DATA is set correctly and game files are downloaded.")
         return
 
@@ -281,7 +288,9 @@ def main():
     total_wins = 0
 
     for i, game_file in enumerate(game_files):
-        print(f"\n[{i+1}/{num_games}] Running game: {os.path.basename(os.path.dirname(game_file))}")
+        # Extract a readable name from the path: .../pick_and_place_simple-X-None-Y-ID/game.tw-pddl
+        game_name = os.path.basename(os.path.dirname(game_file))
+        print(f"\n[{i+1}/{num_games}] Running: {game_name}")
 
         start_time = time.time()
 
