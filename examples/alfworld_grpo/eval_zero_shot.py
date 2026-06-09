@@ -241,7 +241,11 @@ def main():
     from transformers import AutoModelForCausalLM, AutoTokenizer
     import torch
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
+    except Exception:
+        print("Warning: fast tokenizer failed, falling back to slow tokenizer")
+        tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True, use_fast=False)
     model = AutoModelForCausalLM.from_pretrained(
         args.model_path,
         torch_dtype=torch.bfloat16,
