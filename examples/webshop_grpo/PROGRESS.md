@@ -1,6 +1,6 @@
 # WebShop GRPO 项目进度
 
-> 最后更新: 2026-06-09
+> 最后更新: 2026-06-09 20:30
 
 ## 项目概述
 
@@ -22,9 +22,44 @@
 | WebShop 真实环境安装 | ✅ 完成 | 2026-06-08 | conda env `webshop`，Python 3.10 |
 | 零样本评估流程跑通 | ✅ 完成 | 2026-06-08 | Qwen3-1.7B 上运行 50 episodes |
 | Prompt & Action Format 对齐论文 | ✅ 完成 | 2026-06-09 | 统一为 search[query] + click[button] |
-| 零样本评估（更新后） | 🔄 运行中 | 2026-06-09 | hgx18 上正在跑 50 episodes |
+| 零样本评估 Qwen3-1.7B（更新后） | ✅ 完成 | 2026-06-09 | 50 episodes, avg reward = 0.000 |
+| 零样本评估 Qwen3-14B（对比） | 🔄 运行中 | 2026-06-09 | 15 episodes, num_products=200, 排查脚本问题 |
 | 真实 GRPO 训练 | ⏳ 待开始 | — | 需要 WebShop 服务器运行 |
 | 训练后评估 & 对比 | ⏳ 待开始 | — | 需要训练完成 |
+
+---
+
+## 零样本评估结果
+
+### Qwen3-1.7B（50 episodes, num_products=1000）
+
+| 指标 | 值 |
+|------|-----|
+| Average reward | 0.000 |
+| Max reward | 0.000 |
+| Min reward | 0.000 |
+| Non-zero reward rate | 0.0% |
+| Success rate (reward > 0.5) | 0.0% |
+| 耗时 | ~1h40m (~120s/episode) |
+| 结果文件 | `results/webshop_zero_shot/zero_shot_results.json` |
+
+**分析**: 1.7B 小模型完全无法完成购物任务。需要用更大模型（14B）验证是模型能力问题还是脚本问题。
+
+### Qwen3-14B（进行中）
+
+```bash
+python examples/webshop_grpo/evaluate_zero_shot.py \
+    --model_path /workspace/models/Qwen3-14B/ \
+    --num_episodes 15 \
+    --max_steps 15 \
+    --num_products 200 \
+    --output_dir results/webshop_zero_shot_14B
+```
+
+- 目的：排查零 reward 是模型能力不足还是脚本逻辑问题
+- 减少 num_products (1000→200) 和 num_episodes (50→15) 加速测试
+- 如果 14B 能拿到非零 reward → 脚本正常，1.7B 能力不够
+- 如果 14B 也全零 → 需要检查脚本逻辑
 
 ---
 
@@ -115,11 +150,21 @@ cd /workspace/verl && git pull origin webshop-grpo-v0.4.1
 ### 运行零样本评估
 ```bash
 conda activate webshop
+
+# Qwen3-1.7B（完整评估）
 python examples/webshop_grpo/evaluate_zero_shot.py \
     --model_path /workspace/models/Qwen3-1.7B \
     --num_episodes 50 \
     --max_steps 15 \
     --output_dir results/webshop_zero_shot
+
+# Qwen3-14B（快速验证）
+python examples/webshop_grpo/evaluate_zero_shot.py \
+    --model_path /workspace/models/Qwen3-14B/ \
+    --num_episodes 15 \
+    --max_steps 15 \
+    --num_products 200 \
+    --output_dir results/webshop_zero_shot_14B
 ```
 
 ### 运行真实 GRPO 训练
@@ -147,7 +192,8 @@ bash examples/webshop_grpo/run_real.sh
 
 ## 下一步
 
-1. 等零样本评估跑完，检查模型生成的 action 格式是否正确
-2. 分析结果 JSON 中的 episode histories
-3. 启动 WebShop 服务器，运行真实 GRPO 训练
-4. 训练后评估，对比零样本基线
+1. 等 Qwen3-14B 零样本评估完成，判断是脚本问题还是模型能力问题
+2. 如果 14B 也全零 → 检查 evaluate_zero_shot.py 的 action 解析和 env.step() 逻辑
+3. 如果 14B 有非零 reward → 脚本正常，继续 GRPO 训练
+4. 启动 WebShop 服务器，运行真实 GRPO 训练
+5. 训练后评估，对比零样本基线
