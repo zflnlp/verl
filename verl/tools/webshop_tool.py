@@ -49,8 +49,6 @@ class WebShopTool(BaseTool):
             return await self._search(instance_id, parameters.get("query", ""))
         elif tool_name == "click":
             return await self._click(instance_id, parameters.get("target", ""))
-        elif tool_name == "buy":
-            return await self._buy(instance_id)
         else:
             return f"Unknown tool: {tool_name}"
 
@@ -84,20 +82,6 @@ class WebShopTool(BaseTool):
         else:
             return await self._real_click(target)
 
-    async def _buy(self, instance_id: str) -> str:
-        """Purchase the current item.
-
-        Args:
-            instance_id: The interaction instance ID.
-
-        Returns:
-            The result of the purchase.
-        """
-        if self.use_mock:
-            return "Purchase successful! Your order has been placed."
-        else:
-            return await self._real_buy()
-
     async def _real_search(self, query: str) -> str:
         """Search for products using the real WebShop server.
 
@@ -125,21 +109,27 @@ class WebShopTool(BaseTool):
             return f"Error: {str(e)}"
 
     async def _real_click(self, target: str) -> str:
-        """Click on an item using the real WebShop server.
+        """Click on an item or button using the real WebShop server.
 
         Args:
-            target: The item ID or button to click.
+            target: The item ID or button to click (e.g., 'B001' or 'buy').
 
         Returns:
             The result of clicking.
         """
         import aiohttp
 
+        # "buy" is a special click target that triggers purchase
+        if target.lower() == "buy":
+            api_action = {"action": "buy"}
+        else:
+            api_action = {"action": "click", "target": target}
+
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     f"{self.webshop_server}/step",
-                    json={"action": "click", "target": target}
+                    json=api_action
                 ) as resp:
                     if resp.status == 200:
                         data = await resp.json()
@@ -148,32 +138,6 @@ class WebShopTool(BaseTool):
                         return f"Error clicking: {resp.status}"
         except Exception as e:
             logger.error(f"Click failed: {e}")
-            return f"Error: {str(e)}"
-
-    async def _real_buy(self) -> str:
-        """Purchase the current item using the real WebShop server.
-
-        Args:
-            instance_id: The interaction instance ID.
-
-        Returns:
-            The result of the purchase.
-        """
-        import aiohttp
-
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    f"{self.webshop_server}/step",
-                    json={"action": "buy"}
-                ) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        return data.get("observation", "Purchase completed!")
-                    else:
-                        return f"Error purchasing: {resp.status}"
-        except Exception as e:
-            logger.error(f"Purchase failed: {e}")
             return f"Error: {str(e)}"
 
     def _mock_search(self, query: str) -> str:
@@ -213,11 +177,15 @@ class WebShopTool(BaseTool):
         """Generate mock click response.
 
         Args:
-            target: The item ID or button to click.
+            target: The item ID or button to click (e.g., 'B001' or 'buy').
 
         Returns:
             Mock response after clicking.
         """
+        # Handle buy as a click target
+        if target.lower() == "buy":
+            return "Purchase successful! Your order has been placed."
+
         products = {
             "B001": {
                 "name": "Classic Red T-Shirt",

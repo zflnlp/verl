@@ -162,22 +162,23 @@ class WebShopInteraction(BaseInteraction):
         import aiohttp
 
         try:
-            # Parse the action
+            # Parse the action — paper defines two action types:
+            #   search[<query>] and click[<button name>]
+            # "buy" is a click target: click[buy]
             action_lower = action.lower().strip()
 
-            # Determine action type and parameters
             if "search" in action_lower:
-                # Extract search query
                 match = re.search(r'search\[(.*?)\]', action, re.IGNORECASE)
                 query = match.group(1) if match else action
                 api_action = {"action": "search", "query": query}
             elif "click" in action_lower:
-                # Extract click target
                 match = re.search(r'click\[(.*?)\]', action, re.IGNORECASE)
                 target = match.group(1) if match else action
-                api_action = {"action": "click", "target": target}
-            elif "buy" in action_lower or "purchase" in action_lower:
-                api_action = {"action": "buy"}
+                # click[buy] triggers purchase on the server
+                if target.lower() == "buy":
+                    api_action = {"action": "buy"}
+                else:
+                    api_action = {"action": "click", "target": target}
             else:
                 # Default: treat as search
                 api_action = {"action": "search", "query": action}
@@ -229,11 +230,9 @@ class WebShopInteraction(BaseInteraction):
 
         action_history = "\n".join(history_lines) if history_lines else "(no history)"
 
-        # Get available actions (mock or real)
-        if self.use_mock:
-            available_actions = "- search[<query>]: Search for products\n- click[<button name>]: Click on interactive elements\n- click[buy]: Purchase the current item"
-        else:
-            available_actions = "- search[<query>]: Search for products\n- click[<button name>]: Click on interactive elements"
+        # Available actions per paper format: search[<query>] and click[<button name>]
+        # "buy" is a click target, not a separate action type
+        available_actions = "search[<query>]: Search for products using a text query\nclick[<button name>]: Click on interactive elements (e.g., product links, filter buttons, pagination)"
 
         return f"""You are an expert autonomous agent operating in the WebShop e-commerce environment.
 Your task is to: {goal}.
@@ -310,6 +309,9 @@ Now it's your turn to take one action for the current step. You should first rea
     def _process_mock_action(self, action: str, instance: dict) -> Tuple[str, float, bool]:
         """Process an action in mock mode.
 
+        Paper defines two action types: search[<query>] and click[<button name>].
+        "buy" is a click target: click[buy].
+
         Args:
             action: The agent's action string.
             instance: The interaction instance state.
@@ -319,26 +321,29 @@ Now it's your turn to take one action for the current step. You should first rea
         """
         action_lower = action.lower().strip()
 
-        # Check for purchase action
-        if "buy" in action_lower or "purchase" in action_lower:
-            # Simulate a successful purchase with some reward
-            ground_truth = instance.get("ground_truth", {})
-            reward = self._calculate_mock_reward(action, ground_truth)
-            observation = f"You have purchased the item! Reward: {reward:.2f}"
-            return observation, reward, True
-
-        # Check for search action
+        # search[<query>]
         if "search" in action_lower:
             observation = "Found 5 products matching your search. Use click[item_id] to view details."
             return observation, 0.0, False
 
-        # Check for click action
+        # click[<button name>] — including click[buy]
         if "click" in action_lower:
-            observation = "Product details displayed. You can click[buy] to purchase or go back."
-            return observation, 0.0, False
+            # Extract click target
+            match = re.search(r'click\[(.*?)\]', action, re.IGNORECASE)
+            target = match.group(1).strip() if match else ""
+
+            if target.lower() == "buy":
+                # click[buy] triggers purchase
+                ground_truth = instance.get("ground_truth", {})
+                reward = self._calculate_mock_reward(action, ground_truth)
+                observation = f"You have purchased the item! Reward: {reward:.2f}"
+                return observation, reward, True
+            else:
+                observation = "Product details displayed. You can click[buy] to purchase or go back."
+                return observation, 0.0, False
 
         # Default response
-        observation = "I don't understand that action. Please use search[query], click[item_id], or click[buy]."
+        observation = "I don't understand that action. Please use search[query] or click[button]."
         return observation, 0.0, False
 
     def _calculate_mock_reward(self, action: str, ground_truth: dict) -> float:

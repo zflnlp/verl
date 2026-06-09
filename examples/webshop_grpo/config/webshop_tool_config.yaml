@@ -24,7 +24,7 @@ tools:
       type: "function"
       function:
         name: "click"
-        description: "Click on a product or button in the WebShop interface."
+        description: "Click on a product or button in the WebShop interface. Use 'buy' to purchase the current item."
         parameters:
           type: "object"
           properties:
@@ -32,16 +32,3 @@ tools:
               type: "string"
               description: "The item ID or button name to click (e.g., 'B001' or 'buy')"
           required: ["target"]
-
-  - class_name: "verl.tools.webshop_tool.WebShopTool"
-    config:
-      type: native
-      use_mock: true
-    tool_schema:
-      type: "function"
-      function:
-        name: "buy"
-        description: "Purchase the currently viewed product."
-        parameters:
-          type: "object"
-          properties: {}

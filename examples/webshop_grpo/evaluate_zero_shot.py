@@ -126,36 +126,40 @@ Now it's your turn to take one action for the current step. You should first rea
 
 
 def _get_available_actions(observation: str) -> str:
-    """Extract available actions from the current observation."""
+    """Extract available actions from the current observation.
+
+    Paper defines two action types:
+    - search[<query>]: Search for products using a text query (only when search bar present)
+    - click[<button name>]: Click on interactive elements (product links, filter buttons, pagination)
+    """
     actions = []
-    
-    # Always include search if search bar is present (usually is)
-    actions.append('search[<query>]: Search for products using a text query')
-    
-    # Check for clickable elements in observation
-    # Product links usually appear as numbered items
+
+    # search is always available when search bar is present
+    actions.append('search[<query>]')
+
+    # Check for clickable product links
     if re.search(r'\[B\d+\]', observation) or re.search(r'ASIN:', observation):
-        actions.append('click[<product_id>]: Click on a product to view details')
-    
+        actions.append('click[<product_id>]')
+
     # Check for filter buttons
     if 'Rating' in observation or 'Price' in observation or 'Brand' in observation:
-        actions.append('click[<filter>]: Click on a filter option')
-    
+        actions.append('click[<filter>]')
+
     # Check for pagination
     if 'Next' in observation or 'next' in observation:
-        actions.append('click[Next]: Go to next page')
+        actions.append('click[Next]')
     if 'Prev' in observation or 'Previous' in observation:
-        actions.append('click[Prev]: Go to previous page')
-    
+        actions.append('click[Prev]')
+
     # Check for buy button (when viewing product details)
     if 'buy' in observation.lower() or 'add to cart' in observation.lower():
-        actions.append('click[buy]: Purchase the current product')
-    
+        actions.append('click[buy]')
+
     # If no specific actions detected, provide defaults
     if len(actions) <= 1:
-        actions.append('click[<button>]: Click on interactive elements')
-    
-    return "\n".join(f"- {a}" for a in actions)
+        actions.append('click[<button>]')
+
+    return "\n".join(f"  {a}" for a in actions)
 
 
 def evaluate_episode(model, tokenizer, env, task_description: str, max_steps: int = 15) -> Tuple[float, List[Dict]]:

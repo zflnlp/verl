@@ -75,6 +75,7 @@ interaction:
 EOF
 
 # Create real tool config (use_mock=false)
+# Paper defines two action types: search[<query>] and click[<button name>]
 REAL_TOOL_CONFIG="${CONFIG_PATH}/webshop_tool_config_real.yaml"
 cat > ${REAL_TOOL_CONFIG} << EOF
 tools:
@@ -87,7 +88,7 @@ tools:
       type: "function"
       function:
         name: "search"
-        description: "Search for products in the WebShop store."
+        description: "Search for products using a text query."
         parameters:
           type: "object"
           properties:
@@ -105,7 +106,7 @@ tools:
       type: "function"
       function:
         name: "click"
-        description: "Click on a product or button in the WebShop interface."
+        description: "Click on interactive elements. Use 'buy' to purchase the current item."
         parameters:
           type: "object"
           properties:
@@ -113,20 +114,6 @@ tools:
               type: "string"
               description: "The item ID or button name to click (e.g., 'B001' or 'buy')"
           required: ["target"]
-
-  - class_name: "verl.tools.webshop_tool.WebShopTool"
-    config:
-      type: native
-      use_mock: false
-      webshop_server: "${WEBSHOP_SERVER}"
-    tool_schema:
-      type: "function"
-      function:
-        name: "buy"
-        description: "Purchase the currently viewed product."
-        parameters:
-          type: "object"
-          properties: {}
 EOF
 
 echo "=========================================="
