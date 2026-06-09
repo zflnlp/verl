@@ -267,12 +267,11 @@ def main():
     }[args.train_eval]
 
     split_dir = os.path.join(args.alfworld_data_dir, "json_2.1.1", data_split)
-    all_game_dirs = sorted(glob.glob(os.path.join(split_dir, internal_name + "-*")))
-    game_files = []
-    for d in all_game_dirs:
-        gf = os.path.join(d, "game.tw-pddl")
-        if os.path.exists(gf):
-            game_files.append(gf)
+    # ALFWorld game files are nested: task_type-Obj-None-Loc-ID/trial_T*/game.tw-pddl
+    game_files = sorted(glob.glob(
+        os.path.join(split_dir, internal_name + "-*", "**", "game.tw-pddl"),
+        recursive=True
+    ))
 
     if not game_files:
         print(f"No game files found at: {split_dir}/{internal_name}-*")
