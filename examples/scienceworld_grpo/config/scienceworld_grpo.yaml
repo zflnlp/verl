@@ -38,15 +38,12 @@ actor_rollout_ref:
       optimizer_offload: False
   rollout:
     name: vllm
-    mode: async
     tensor_model_parallel_size: 1
     gpu_memory_utilization: 0.6
     n: 4
     log_prob_micro_batch_size_per_gpu: 8
     multi_turn:
-      enable: True
-      max_assistant_turns: 25
-      max_user_turns: 1
+      enable: False
   ref:
     log_prob_micro_batch_size_per_gpu: 8
     fsdp_config:

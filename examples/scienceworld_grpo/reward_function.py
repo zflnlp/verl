@@ -14,15 +14,55 @@
 """
 Reward function for ScienceWorld GRPO training.
 
-In real mode, the environment provides the primary reward via tool_rewards.
-In mock mode or as fallback, we estimate reward from the agent's trajectory.
+This reward function directly interacts with the ScienceWorld environment
+to get real environment scores. It extracts actions from the model's
+response and executes them in the environment.
 """
 
 import re
 from typing import Any, Optional
 
 
+def _extract_actions(text: str) -> list:
+    """Extract all actions from <action> tags in the response."""
+    actions = re.findall(r'<action>\s*(.*?)\s*</action>', text, re.IGNORECASE | re.DOTALL)
+    return [a.strip() for a in actions if a.strip()]
+
+
+def _run_scienceworld_episode(task_name: str, variation: int, actions: list) -> float:
+    """Run actions in ScienceWorld and return the final score.
+
+    Args:
+        task_name: ScienceWorld task name (e.g. "boil")
+        variation: Variation index
+        actions: List of action strings to execute
+
+    Returns:
+        Final score normalized to 0-1 (ScienceWorld returns 0-100)
+    """
+    try:
+        from scienceworld import ScienceWorldEnv
+
+        env = ScienceWorldEnv()
+        env.load(task_name, variation)
+
+        final_score = 0.0
+        for action in actions:
+            obs, score, is_done, info = env.step(action)
+            final_score = info.get("score", score)
+            if is_done:
+                break
+
+        # Normalize: ScienceWorld score is 0-100
+        return final_score / 100.0 if final_score > 1.0 else final_score
+
+    except Exception as e:
+        print(f"[reward_fn] ScienceWorld error: {e}")
+        return 0.0
+
+
 def compute_score(
+    data_source: str,
     solution_str: str,
     ground_truth: Any,
     extra_info: Optional[dict] = None,
@@ -30,10 +70,16 @@ def compute_score(
 ) -> float:
     """Compute reward for ScienceWorld task completion.
 
+    This function:
+    1. Extracts actions from the model's <action> tags
+    2. Runs them in the real ScienceWorld environment
+    3. Returns the environment score (0-1)
+
     Args:
-        solution_str: The agent's final response or action sequence.
-        ground_truth: Dictionary containing task information.
-        extra_info: Additional information including tool_rewards.
+        data_source: Data source identifier (e.g. "scienceworld")
+        solution_str: The model's response containing <action> tags
+        ground_truth: Dictionary containing task information
+        extra_info: Additional information (unused in this version)
 
     Returns:
         Reward score between 0.0 and 1.0.
@@ -45,88 +91,26 @@ def compute_score(
         except Exception:
             ground_truth = {}
 
-    # Primary: use environment reward from tool_rewards if available
-    tool_rewards = []
-    if extra_info and "tool_rewards" in extra_info:
-        tool_rewards = extra_info["tool_rewards"]
+    task_name = ground_truth.get("task_name", "boil")
+    variation = ground_truth.get("variation", 0)
 
-    if tool_rewards:
-        env_reward = tool_rewards[-1] if tool_rewards else 0.0
-        return float(env_reward)
+    # Extract actions from model response
+    actions = _extract_actions(solution_str)
 
-    # Fallback: estimate from trajectory
-    return _parse_solution_reward(solution_str, ground_truth)
-
-
-def _parse_solution_reward(solution_str: str, ground_truth: dict) -> float:
-    """Estimate reward from the agent's solution trajectory.
-
-    Args:
-        solution_str: The agent's response text.
-        ground_truth: Expected task attributes.
-
-    Returns:
-        Estimated reward score.
-    """
-    reward = 0.0
-
-    # Extract actions from <action> tags
-    actions = re.findall(r'<action>\s*(.*?)\s*</action>', solution_str, re.IGNORECASE | re.DOTALL)
-    action_text = " ".join(actions).lower() if actions else solution_str.lower()
-
-    # Reward for action diversity
-    action_types = set()
-    action_keywords = ["look", "examine", "open", "take", "put", "use", "toggle", "pour", "mix", "go to"]
-    for keyword in action_keywords:
-        if keyword in action_text:
-            action_types.add(keyword)
-
-    if len(action_types) >= 5:
-        reward += 0.4
-    elif len(action_types) >= 3:
-        reward += 0.2
-    elif len(action_types) >= 1:
-        reward += 0.1
-
-    # Reward for task-related actions
-    task_name = ground_truth.get("task_name", "").lower()
-    goal = ground_truth.get("goal", "").lower()
-
-    task_success_indicators = {
-        "boil": ["boil", "temperature", "stove", "heat", "pot"],
-        "melt": ["melt", "heat", "temperature", "stove"],
-        "freeze": ["freeze", "cold", "ice", "temperature"],
-        "grow-plant": ["water", "grow", "soil", "seed", "plant"],
-        "find-living": ["find", "living", "animal", "plant"],
-        "chemistry-mix": ["mix", "react", "combine", "chemical"],
-        "power-component": ["connect", "wire", "battery", "power"],
-        "test-conductivity": ["test", "conduct", "material"],
-    }
-
-    for task_key, indicators in task_success_indicators.items():
-        if task_key in task_name or task_key in goal:
-            matched = sum(1 for ind in indicators if ind in action_text)
-            if matched >= 2:
-                reward += 0.3
-                break
-            elif matched >= 1:
-                reward += 0.15
+    if not actions:
+        # No valid actions found, try to extract from raw text
+        # Fallback: use the last non-empty line as action
+        lines = solution_str.strip().split("\n")
+        for line in reversed(lines):
+            line = line.strip()
+            if line and not line.startswith("<") and not line.startswith("#"):
+                actions = [line]
                 break
 
-    # Reward for reasoning (thought tags)
-    thought_count = len(re.findall(r'<thought>', solution_str, re.IGNORECASE))
-    if thought_count >= 3:
-        reward += 0.2
-    elif thought_count >= 1:
-        reward += 0.1
+    if not actions:
+        return 0.0
 
-    # Penalty for repeated actions
-    if actions:
-        consecutive_repeats = sum(
-            1 for i in range(1, len(actions))
-            if actions[i].strip().lower() == actions[i - 1].strip().lower()
-        )
-        if consecutive_repeats > 3:
-            reward -= 0.1
+    # Run in ScienceWorld environment
+    env_reward = _run_scienceworld_episode(task_name, variation, actions)
 
-    return max(0.0, min(1.0, reward))
+    return env_reward
