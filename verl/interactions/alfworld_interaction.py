@@ -350,25 +350,19 @@ class AlfworldInteraction(BaseInteraction):
         # Format admissible actions
         admissible_actions = instance.get("admissible_actions", [])
         if admissible_actions:
-            available_actions = "\n".join(f"- {a}" for a in admissible_actions[:30])
+            available_actions = ", ".join(a for a in admissible_actions[:30])
         else:
-            available_actions = "- look\n- inventory\n- go to <location>\- take <object>"
+            available_actions = "look, inventory"
 
-        return f"""You are a household robot agent performing tasks in a simulated home environment.
-Your task is: {goal}
-Task type: {task_type}
-
-Prior to this step, you have already taken {step_count - 1} step(s).
-Below are the most recent {history_length} observations and the corresponding actions you took:
+        return f"""You are an expert agent operating in the ALFRED Embodied Environment. Your task is: {goal}
+Prior to this step, you have already taken {step_count - 1} step(s). Below are the most recent {history_length} observations and the corresponding actions you took:
 {action_history}
+You are now at step {step_count} and your current observation is: {raw_observation}
+Your admissible actions of the current situation are: [{available_actions}].
 
-You are now at step {step_count} and your current observation is:
-{raw_observation}
-
-Your admissible actions of the current situation are:
-{available_actions}
-
-Now it's your turn to take one action for the current step. You should first reason step-by-step about the current situation, then think carefully which admissible action best advances the household task. This reasoning process MUST be enclosed within <thought> tags. Once you've finished your reasoning, you should choose an admissible action for current step and present it within <action> </action> tags."""
+Now it's your turn to take an action.
+You should first reason step-by-step about the current situation. This reasoning process MUST be enclosed within <thought> tags.
+Once you've finished your reasoning, you should choose an admissible action for current step and present it within <action> </action> tags."""
 
     async def calculate_score(self, instance_id: str, **kwargs) -> float:
         """Calculate the reward score for the interaction.

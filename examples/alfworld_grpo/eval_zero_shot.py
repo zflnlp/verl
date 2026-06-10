@@ -64,24 +64,19 @@ def format_prompt(task_description: str, step_count: int, history: list,
 
     # Format admissible actions
     if admissible_actions:
-        available_actions = "\n".join(f"- {a}" for a in admissible_actions[:30])
+        available_actions = ", ".join(a for a in admissible_actions[:30])
     else:
         available_actions = "- look\n- inventory"
 
-    return f"""You are a household robot agent performing tasks in a simulated home environment.
-Your task is: {task_description}
-
-Prior to this step, you have already taken {step_count - 1} step(s).
-Below are the most recent {history_length} observations and the corresponding actions you took:
+    return f"""You are an expert agent operating in the ALFRED Embodied Environment. Your task is: {task_description}
+Prior to this step, you have already taken {step_count - 1} step(s). Below are the most recent {history_length} observations and the corresponding actions you took:
 {action_history}
+You are now at step {step_count} and your current observation is: {observation}
+Your admissible actions of the current situation are: [{available_actions}].
 
-You are now at step {step_count} and your current observation is:
-{observation}
-
-Your admissible actions of the current situation are:
-{available_actions}
-
-Now it's your turn to take one action for the current step. You should first reason step-by-step about the current situation, then think carefully which admissible action best advances the household task. This reasoning process MUST be enclosed within <thought> tags. Once you've finished your reasoning, you should choose an admissible action for current step and present it within <action> </action> tags."""
+Now it's your turn to take an action.
+You should first reason step-by-step about the current situation. This reasoning process MUST be enclosed within <thought> tags.
+Once you've finished your reasoning, you should choose an admissible action for current step and present it within <action> </action> tags."""
 
 
 def build_alfworld_config(alfworld_data_dir: str, task_type_ids: list) -> dict:
@@ -156,7 +151,7 @@ def run_episode(env, model, tokenizer, max_steps: int) -> dict:
 
         # Generate response
         messages = [
-            {"role": "system", "content": "You are a household robot agent performing tasks in a simulated home environment."},
+            {"role": "system", "content": "You are an expert agent operating in the ALFRED Embodied Environment."},
             {"role": "user", "content": prompt},
         ]
 
