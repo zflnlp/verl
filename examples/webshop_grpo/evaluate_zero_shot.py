@@ -68,7 +68,7 @@ def parse_action(response: str) -> str:
         action = action.split('\n')[0].strip()
         # Validate action format
         if re.match(r'^(search|click)\[', action, re.IGNORECASE):
-            return action
+            return _clean_action(action)
         # If it's just "buy", convert to click[buy]
         if action.lower() == 'buy':
             return 'click[buy]'
@@ -81,7 +81,7 @@ def parse_action(response: str) -> str:
     for pattern in patterns:
         match = re.search(pattern, response, re.IGNORECASE)
         if match:
-            return match.group(1)
+            return _clean_action(match.group(1))
 
     # Last resort: check for "buy" keyword
     if 'buy' in response.lower():
@@ -90,15 +90,28 @@ def parse_action(response: str) -> str:
     return ""
 
 
+def _clean_action(action: str) -> str:
+    """Clean up an action string.
+
+    Models sometimes generate extra quotes like search["query"] — strip them.
+    WebShop expects: search[query] or click[target] without inner quotes.
+    """
+    # Remove wrapping quotes inside brackets: search["query"] -> search[query]
+    action = re.sub(r'\[["\']([^"\']*)["\']\]', r'[\1]', action)
+    return action
+
+
 def extract_instruction(observation: str) -> str:
     """Extract the task instruction from WebShop observation.
 
-    WebShop observations typically start with:
-        Instruction:  <instruction text>  [SEP]
-    The instruction may span multiple lines.
+    WebShop observations use the format:
+        Instruction: [SEP] <instruction text> [SEP]
+    or:
+        WebShop [SEP] Instruction: [SEP] <instruction text> [SEP]
+    The instruction sits between the first [SEP] after "Instruction:" and the next [SEP].
     """
-    # Try "Instruction:" followed by "[SEP]"
-    match = re.search(r'Instruction:\s*(.*?)\[SEP\]', observation, re.DOTALL)
+    # Pattern: "Instruction:" then optional whitespace, then [SEP], then the instruction, then [SEP]
+    match = re.search(r'Instruction:\s*\[SEP\]\s*(.*?)\s*\[SEP\]', observation, re.DOTALL)
     if match:
         instruction = match.group(1).strip()
         # Collapse whitespace
@@ -106,11 +119,13 @@ def extract_instruction(observation: str) -> str:
         if instruction:
             return instruction
 
-    # Try extracting from the first line if it looks like an instruction
-    first_line = observation.split('\n')[0].strip()
-    if first_line and len(first_line) > 10 and 'Instruction' not in first_line:
-        # Might be the instruction directly
-        pass
+    # Fallback: try without the leading [SEP]
+    match = re.search(r'Instruction:\s*(.*?)\s*\[SEP\]', observation, re.DOTALL)
+    if match:
+        instruction = match.group(1).strip()
+        instruction = re.sub(r'\s+', ' ', instruction)
+        if instruction:
+            return instruction
 
     return ""
 
