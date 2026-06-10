@@ -14,19 +14,12 @@
 """
 Data preprocessing script for ScienceWorld GRPO training.
 
-Supports two modes:
-1. Mock mode (--use_mock): Generates synthetic data for pipeline testing.
-2. Real mode (--task_name boil --num_variations 10): Uses ScienceWorld API
-   to generate data from real task variations.
+Uses ScienceWorld's built-in train/dev/test splits.
 
-Usage (mock):
+Usage:
     python examples/scienceworld_grpo/data_preprocess.py \
-        --local_save_dir ~/data/scienceworld --num_tasks 100
-
-Usage (real):
-    python examples/scienceworld_grpo/data_preprocess.py \
-        --local_save_dir ~/data/scienceworld_real \
-        --task_name boil --num_variations 10 --use_real_env
+        --local_save_dir /workspace/data/scienceworld_real \
+        --task_name boil --use_real_env
 """
 
 import argparse
@@ -37,89 +30,45 @@ import random
 import pandas as pd
 
 
-# ScienceWorld tasks with their variations (from README)
-SCIENCEWORLD_TASKS = {
-    "boil": {"variations": 30, "goal": "Boil a liquid using appropriate laboratory equipment"},
-    "melt": {"variations": 30, "goal": "Melt a solid substance by applying heat"},
-    "freeze": {"variations": 30, "goal": "Freeze a liquid by lowering its temperature"},
-    "change-the-state-of-matter-of": {"variations": 30, "goal": "Change the state of matter of a substance"},
-    "use-thermometer": {"variations": 540, "goal": "Use a thermometer to measure temperature"},
-    "power-component": {"variations": 20, "goal": "Power an electrical component using a battery"},
-    "test-conductivity": {"variations": 900, "goal": "Test whether materials are electrical conductors"},
-    "find-living-thing": {"variations": 300, "goal": "Find and identify a living thing in the environment"},
-    "find-non-living-thing": {"variations": 300, "goal": "Find and identify a non-living thing"},
-    "find-plant": {"variations": 300, "goal": "Find and identify a plant"},
-    "find-animal": {"variations": 300, "goal": "Find and identify an animal"},
-    "grow-plant": {"variations": 126, "goal": "Grow a plant from a seed and observe its growth"},
-    "grow-fruit": {"variations": 126, "goal": "Grow a plant that produces fruit"},
-    "chemistry-mix": {"variations": 32, "goal": "Mix chemicals to create a chemical reaction"},
-    "identify-life-stages-1": {"variations": 14, "goal": "Identify the life stages of an organism"},
-    "inclined-plane-determine-angle": {"variations": 168, "goal": "Determine the angle of an inclined plane"},
-}
+def generate_real_dataset_with_splits(task_name: str) -> dict:
+    """Generate dataset from real ScienceWorld with built-in train/dev/test splits.
 
+    Uses ScienceWorld's get_variations_train/dev/test methods.
 
-def generate_mock_dataset(num_tasks: int, seed: int) -> list:
-    """Generate a mock dataset of ScienceWorld tasks."""
-    random.seed(seed)
-    tasks = []
-    task_names = list(SCIENCEWORLD_TASKS.keys())
-
-    for i in range(num_tasks):
-        task_name = random.choice(task_names)
-        task_info = SCIENCEWORLD_TASKS[task_name]
-        variation = random.randint(0, min(task_info["variations"] - 1, 29))
-        tasks.append({
-            "task_id": f"task_{seed + i}",
-            "task_name": task_name,
-            "variation": variation,
-            "goal": task_info["goal"],
-        })
-    return tasks
-
-
-def generate_real_dataset(task_name: str, num_variations: int, seed: int) -> list:
-    """Generate dataset from real ScienceWorld task variations.
-
-    Uses the ScienceWorld API to get real task descriptions.
-    Falls back to predefined descriptions if API unavailable.
+    Returns:
+        Dictionary with 'train', 'dev', 'test' keys, each containing a list of task dicts.
     """
-    random.seed(seed)
+    from scienceworld import ScienceWorldEnv
 
-    if task_name not in SCIENCEWORLD_TASKS:
-        raise ValueError(f"Unknown task: {task_name}. Available: {list(SCIENCEWORLD_TASKS.keys())}")
+    env = ScienceWorldEnv()
 
-    task_info = SCIENCEWORLD_TASKS[task_name]
-    max_variations = task_info["variations"]
-    num_variations = min(num_variations, max_variations)
-
-    # Try to get real task descriptions from ScienceWorld API
-    real_goals = {}
-    try:
-        from scienceworld import ScienceWorldEnv
-        env = ScienceWorldEnv()
-        for var_idx in range(num_variations):
+    splits = {}
+    for split_name, get_fn in [
+        ("train", env.get_variations_train),
+        ("dev", env.get_variations_dev),
+        ("test", env.get_variations_test),
+    ]:
+        variations = get_fn()
+        tasks = []
+        for var_idx in variations:
             try:
                 env.load(task_name, var_idx)
-                real_goals[var_idx] = env.taskdescription()
+                goal = env.taskdescription()
             except Exception as e:
-                print(f"Warning: Could not load variation {var_idx}: {e}")
-        del env
-    except ImportError:
-        print("Warning: scienceworld package not installed, using default goals")
-    except Exception as e:
-        print(f"Warning: Could not initialize ScienceWorld: {e}")
+                print(f"Warning: Could not load {task_name} var {var_idx}: {e}")
+                goal = f"Complete the {task_name} task"
 
-    tasks = []
-    for var_idx in range(num_variations):
-        goal = real_goals.get(var_idx, task_info["goal"])
-        tasks.append({
-            "task_id": f"{task_name}_var{var_idx}",
-            "task_name": task_name,
-            "variation": var_idx,
-            "goal": goal,
-        })
+            tasks.append({
+                "task_id": f"{task_name}_var{var_idx}",
+                "task_name": task_name,
+                "variation": var_idx,
+                "goal": goal,
+            })
+        splits[split_name] = tasks
+        print(f"  {split_name}: {len(tasks)} variations")
 
-    return tasks
+    del env
+    return splits
 
 
 def format_for_verl(tasks: list) -> pd.DataFrame:
@@ -128,13 +77,13 @@ def format_for_verl(tasks: list) -> pd.DataFrame:
 
     for task in tasks:
         prompt = f"""Your ScienceWorld task is: {task['goal']}.
-Prior to this step, you have already taken 0 step(s).
-Below are the most recent 0 observations and the corresponding actions you took:
-(no history)
-You are now at step 1 and your current observation is:
-You are in a well-equipped science laboratory. There are workbenches with various equipment, chemical supplies, and scientific instruments. A sink is available for water.
+Prior to this step, you have already taken 0 step(s). Below are the most recent 0 observations and the corresponding actions you took: (no history)
+You are now at step 1 and your current observation is: You are in a well-equipped science laboratory. There are workbenches with various equipment, chemical supplies, and scientific instruments. A sink is available for water.
 Your valid actions of the current situation are: [look around, examine <object>, open <object>, close <object>, take <object> from <location>, put <object> in/on <location>, use <object> [on <object>], toggle <object>, pour <object> into <object>, mix <object>, go to <location>, look at <object>, wait, task].
-Now it's your turn to take an action. You should first reason step-by-step about the current situation. This reasoning process MUST be enclosed within <thought> tags. Once you've finished your reasoning, you should choose a valid action for the current step and present it within <action> </action> tags."""
+
+Now it's your turn to take an action.
+You should first reason step-by-step about the current situation. This reasoning process MUST be enclosed within <thought> tags.
+Once you've finished your reasoning, you should choose a valid action for the current step and present it within <action> </action> tags."""
 
         messages = [
             {"role": "user", "content": prompt},
@@ -162,64 +111,60 @@ def main():
                         help="Directory to save the generated data")
     parser.add_argument("--task_name", type=str, default="boil",
                         help="ScienceWorld task name (e.g. boil, melt, find-living-thing)")
-    parser.add_argument("--num_variations", type=int, default=10,
-                        help="Number of task variations to use (real mode)")
-    parser.add_argument("--num_tasks", type=int, default=100,
-                        help="Number of tasks to generate (mock mode)")
     parser.add_argument("--use_real_env", action="store_true",
-                        help="Use real ScienceWorld API to get task descriptions")
+                        help="Use real ScienceWorld API with built-in train/dev/test splits")
     parser.add_argument("--seed", type=int, default=42,
                         help="Random seed for reproducibility")
-    parser.add_argument("--train_ratio", type=float, default=0.8,
-                        help="Ratio of training data")
 
     args = parser.parse_args()
 
     save_dir = os.path.expanduser(args.local_save_dir)
     os.makedirs(save_dir, exist_ok=True)
 
-    # Generate tasks
-    if args.use_real_env:
-        print(f"Generating data from real ScienceWorld task: {args.task_name}")
-        print(f"Using {args.num_variations} variations")
-        tasks = generate_real_dataset(args.task_name, args.num_variations, args.seed)
-    else:
-        print(f"Generating {args.num_tasks} mock ScienceWorld tasks...")
-        tasks = generate_mock_dataset(args.num_tasks, args.seed)
+    if not args.use_real_env:
+        print("Error: This script requires --use_real_env flag for proper train/dev/test splits.")
+        print("Usage: python data_preprocess.py --local_save_dir /workspace/data/scienceworld_real --task_name boil --use_real_env")
+        return
 
-    # Split into train and test
-    random.seed(args.seed)
-    random.shuffle(tasks)
-    split_idx = int(len(tasks) * args.train_ratio)
-    train_tasks = tasks[:split_idx]
-    test_tasks = tasks[split_idx:]
+    print(f"Generating data from real ScienceWorld task: {args.task_name}")
+    print("Using ScienceWorld's built-in train/dev/test splits...")
+
+    splits = generate_real_dataset_with_splits(args.task_name)
 
     # Format for verl
-    train_df = format_for_verl(train_tasks)
-    test_df = format_for_verl(test_tasks)
+    train_df = format_for_verl(splits["train"])
+    val_df = format_for_verl(splits["dev"])
+    test_df = format_for_verl(splits["test"])
 
     # Save
     train_path = os.path.join(save_dir, "train.parquet")
+    val_path = os.path.join(save_dir, "val.parquet")
     test_path = os.path.join(save_dir, "test.parquet")
 
     train_df.to_parquet(train_path, index=False)
+    val_df.to_parquet(val_path, index=False)
     test_df.to_parquet(test_path, index=False)
 
     metadata_path = os.path.join(save_dir, "task_metadata.json")
     with open(metadata_path, "w") as f:
         json.dump({
-            "mode": "real" if args.use_real_env else "mock",
-            "task_name": args.task_name if args.use_real_env else "mixed",
-            "num_variations": args.num_variations if args.use_real_env else None,
-            "num_tasks": args.num_tasks if not args.use_real_env else None,
-            "seed": args.seed,
-            "train_size": len(train_tasks),
-            "test_size": len(test_tasks),
+            "task_name": args.task_name,
+            "split_method": "scienceworld_builtin",
+            "train_size": len(splits["train"]),
+            "val_size": len(splits["dev"]),
+            "test_size": len(splits["test"]),
+            "train_variations": [t["variation"] for t in splits["train"]],
+            "val_variations": [t["variation"] for t in splits["dev"]],
+            "test_variations": [t["variation"] for t in splits["test"]],
         }, f, indent=2)
 
-    print(f"Generated {len(train_tasks)} training tasks and {len(test_tasks)} test tasks")
-    print(f"Saved to: {save_dir}")
+    print(f"\nGenerated:")
+    print(f"  Train: {len(splits['train'])} tasks")
+    print(f"  Dev:   {len(splits['dev'])} tasks")
+    print(f"  Test:  {len(splits['test'])} tasks")
+    print(f"\nSaved to: {save_dir}")
     print(f"  - {train_path}")
+    print(f"  - {val_path}")
     print(f"  - {test_path}")
     print(f"  - {metadata_path}")
 

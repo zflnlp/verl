@@ -102,7 +102,7 @@ python3 -m verl.trainer.main_ppo \
     --config-path="$CONFIG_PATH" \
     --config-name='scienceworld_grpo' \
     data.train_files=${DATA_DIR}/train.parquet \
-    data.val_files=${DATA_DIR}/test.parquet \
+    data.val_files=${DATA_DIR}/val.parquet \
     data.train_batch_size=${TRAIN_BATCH_SIZE} \
     data.max_prompt_length=${MAX_PROMPT_LENGTH} \
     data.max_response_length=${MAX_RESPONSE_LENGTH} \
