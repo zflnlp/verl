@@ -4,7 +4,13 @@
 基于 verl 框架为 ScienceWorld benchmark 构建 GRPO 训练管线，训练 Qwen3-1.7B 模型完成科学实验任务。
 
 ## 当前状态
-**阶段**: 数据划分完成，准备运行 GRPO 训练
+**阶段**: GRPO 训练已跑通，正在分析结果和优化
+
+## 源码参考
+- ScienceWorld 源码: `benchmarks/ScienceWorld/`
+- WebShop 源码: `benchmarks/WebShop/`
+- alfworld 源码: `benchmarks/alfworld/`
+- 数据目录: `data/`
 
 ## 已完成工作
 
@@ -78,29 +84,26 @@ CUDA_VISIBLE_DEVICES=0 bash examples/scienceworld_grpo/run_real.sh \
     actor_rollout_ref.actor.ppo_mini_batch_size=4
 ```
 
-**训练结果（6 steps）**:
-- 平均奖励: 0.002（很低，1.7B 模型学习能力有限）
+**训练结果（3 steps，14 个训练样本）**:
+- 平均奖励: 0.001
 - 最大奖励: 0.020
-- 优势范围: [-0.866, +0.866]（有学习信号）
-- 奖励函数正常工作（timing_s/reward: 19.7s）
+- 优势范围: [-0.5, +1.5]（有学习信号）
+- 奖励函数正常工作（timing_s/reward: 19.4s）
 
 **关键发现**:
 - vllm 不支持多轮交互的 async 模式（verl 需要 sglang）
 - 改为 sync 模式，reward function 直接调用 ScienceWorld 环境
 - 这是主流做法（DeepSeek-R1、Search-R1 等都用这种方式）
+- 训练数据太少（14 个样本），需要增加数据量
 
 **Checkpoint 位置**:
-`checkpoints/verl_grpo_scienceworld_real/scienceworld_real_grpo_20260609_0941/global_step_6/`
+`checkpoints/verl_grpo_scienceworld_real/scienceworld_real_grpo_20260610_0940/global_step_3/`
 
 ## 待完成工作
 
-### 7. 重新训练（使用正确的 train/dev/test 划分）⏳
-```bash
-conda activate verl
-CUDA_VISIBLE_DEVICES=0 bash examples/scienceworld_grpo/run_real.sh \
-    data.train_batch_size=4 \
-    actor_rollout_ref.actor.ppo_mini_batch_size=4
-```
+### 7. 增加训练数据 ⏳
+- 用多个任务（boil + melt + freeze 等）生成更多训练数据
+- 或者用更大的 batch size
 
 ### 8. Checkpoint 格式转换
 verl checkpoint 是 `.pt` 格式，需要转换为 HuggingFace 格式才能用 eval 脚本测试
@@ -110,6 +113,10 @@ verl checkpoint 是 `.pt` 格式，需要转换为 HuggingFace 格式才能用 e
 - 报告 Average Score (0-100) 和 Success Rate (%)
 - 对比 baseline（1.7B: 0.0, 14B: 1.0）
 
+### 10. 对齐参考论文的任务选择
+- 需要阅读参考论文（TCOD）确认使用了哪些 ScienceWorld 任务
+- 确保训练数据与参考论文一致
+
 ## 关键文件
 - `eval_zero_shot.py` — 零样本评估脚本
 - `data_preprocess.py` — 数据预处理脚本（使用 ScienceWorld 内置划分）
@@ -118,6 +125,7 @@ verl checkpoint 是 `.pt` 格式，需要转换为 HuggingFace 格式才能用 e
 - `run_real.sh` — 真实训练脚本
 - `verl/interactions/scienceworld_interaction.py` — 核心交互类
 - `verl/tools/scienceworld_tool.py` — action 工具
+- `benchmarks/ScienceWorld/` — ScienceWorld 源码
 
 ## 奖励函数设计
 **当前方案**: reward function 直接调用 ScienceWorld 环境
@@ -155,3 +163,4 @@ verl checkpoint 是 `.pt` 格式，需要转换为 HuggingFace 格式才能用 e
 ## 恢复指令
 1. 运行训练: `CUDA_VISIBLE_DEVICES=0 bash examples/scienceworld_grpo/run_real.sh data.train_batch_size=4 actor_rollout_ref.actor.ppo_mini_batch_size=4`
 2. 评估模型: `python examples/scienceworld_grpo/eval_zero_shot.py --model_path <checkpoint_path> --task_name boil --num_variations 9 --max_steps 10`
+3. 查看 ScienceWorld 源码: `ls benchmarks/ScienceWorld/`
