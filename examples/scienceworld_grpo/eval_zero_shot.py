@@ -82,11 +82,7 @@ Below are the most recent {history_length} observations and the corresponding ac
 You are now at step {step_count} and your current observation is:
 {observation}
 Your valid actions of the current situation are: [{available_actions}].
-Now it's your turn to take an action. You should first reason step-by-step about the current situation. This reasoning process MUST be enclosed within <thought> tags. Once you've finished your reasoning, you MUST choose EXACTLY ONE valid action from the list above and present it within <action> </action> tags. Do NOT write anything after the </action> tag.
-
-Example response:
-<thought>I need to find water. The sink is available, so I should go to the sink.</thought>
-<action>go to sink</action>"""
+Now it's your turn to take an action. You should first reason step-by-step about the current situation. This reasoning process MUST be enclosed within <thought> tags. Once you've finished your reasoning, you MUST choose EXACTLY ONE valid action from the list above and present it within <action> </action> tags. Do NOT write anything after the </action> tag."""
 
 
 def run_episode(env, model, tokenizer, task_name: str, variation: int,
