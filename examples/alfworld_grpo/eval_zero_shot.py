@@ -205,6 +205,8 @@ def main():
     parser.add_argument("--model_path", type=str, required=True, help="Path to the model")
     parser.add_argument("--task_type", type=str, default="pick_and_place",
                         help="ALFWorld task type (short name: pick_and_place, pick_clean_then_place, etc.)")
+    parser.add_argument("--all_task_types", action="store_true",
+                        help="Evaluate on all 6 task types")
     parser.add_argument("--num_games", type=int, default=10, help="Number of games to evaluate")
     parser.add_argument("--max_steps", type=int, default=30, help="Max steps per episode")
     parser.add_argument("--alfworld_data_dir", type=str, default=os.environ.get("ALFWORLD_DATA", "/workspace/data/alf_data"),
