@@ -52,11 +52,11 @@
 ### ✅ Zero-shot 评估完成
 | 模型 | Win Rate | 备注 |
 |------|----------|------|
-| Qwen3-1.7B | 0%（待重测） | 旧结果（dones bug 时跑的，1 步结束） |
+| Qwen3-1.7B | **20%** | 2 WON（12步）/ 8 LOST（30步超时） |
 | Qwen3-14B | **50%** | 5 WON（4步完成）/ 5 LOST（30步超时） |
 
 - 结果路径：`/workspace/data/alfworld_eval_zero_shot_14B/results.json`
-- 1.7B 正在重测中（bug 修复后）
+- 1.7B 结果：`/workspace/data/alfworld_eval_zero_shot_1.7B/results.json`
 
 ### ✅ GitHub 推送
 - 分支：`webshop-grpo-v0.4.1`
@@ -65,17 +65,6 @@
 ---
 
 ## 进行中
-
-### ⏳ 1.7B Zero-shot 重测
-```bash
-CUDA_VISIBLE_DEVICES=0 python examples/alfworld_grpo/eval_zero_shot.py \
-    --model_path /workspace/models/Qwen3-1.7B/ \
-    --task_type pick_and_place \
-    --num_games 10 --max_steps 30 \
-    --alfworld_data_dir /workspace/data/alf_data \
-    --output_dir /workspace/data/alfworld_eval_zero_shot_1.7B
-```
-
 ### ⏳ Mock 训练
 - 命令：`bash examples/alfworld_grpo/run_mock.sh`
 - 状态：**首次运行报 GPU 显存不足**（公用机器卡被占用）
