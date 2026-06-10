@@ -314,11 +314,21 @@ def main():
 
     # Summary
     win_rate = total_wins / num_games if num_games > 0 else 0.0
+    avg_steps_all = sum(r['num_steps'] for r in results) / len(results) if results else 0
+    won_results = [r for r in results if r.get('won', False)]
+    lost_results = [r for r in results if not r.get('won', False)]
+    avg_steps_won = sum(r['num_steps'] for r in won_results) / len(won_results) if won_results else 0
+    avg_steps_lost = sum(r['num_steps'] for r in lost_results) / len(lost_results) if lost_results else 0
     print(f"\n{'='*50}")
     print(f"Task type: {args.task_type} ({internal_name})")
     print(f"Games played: {num_games}")
     print(f"Wins: {total_wins}")
     print(f"Win rate: {win_rate:.3f}")
+    print(f"Avg steps (all): {avg_steps_all:.1f}")
+    if won_results:
+        print(f"Avg steps (won): {avg_steps_won:.1f}")
+    if lost_results:
+        print(f"Avg steps (lost): {avg_steps_lost:.1f}")
     print(f"{'='*50}")
 
     # Save results
