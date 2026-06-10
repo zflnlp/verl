@@ -1,0 +1,9 @@
+{
+  "mode": "mock",
+  "task_type": "mixed",
+  "num_games": null,
+  "num_tasks": 100,
+  "seed": 42,
+  "train_size": 80,
+  "test_size": 20
+}

@@ -1,0 +1,16 @@
+{
+  "num_tasks": 50,
+  "train_size": 40,
+  "test_size": 10,
+  "seed": 42,
+  "categories": [
+    "books",
+    "electronics",
+    "home",
+    "shoes",
+    "beauty",
+    "toys",
+    "clothing",
+    "sports"
+  ]
+}

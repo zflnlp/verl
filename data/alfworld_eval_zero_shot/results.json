@@ -1,0 +1,192 @@
+{
+  "model_path": "/workspace/models/Qwen3-1.7B",
+  "task_type": "pick_and_place",
+  "task_type_internal": "pick_and_place_simple",
+  "num_games": 10,
+  "max_steps": 30,
+  "total_wins": 0,
+  "win_rate": 0.0,
+  "timestamp": "2026-06-09T07:48:22.997807",
+  "results": [
+    {
+      "num_steps": 1,
+      "won": false,
+      "reward": 0.0,
+      "history": [
+        {
+          "step": 1,
+          "action": "Alternatively, the user might need to use",
+          "observation": [
+            "Nothing happens."
+          ],
+          "won": false
+        }
+      ],
+      "game_index": 0,
+      "game_file": "/workspace/data/alf_data/json_2.1.1/valid_unseen/pick_and_place_simple-Mug-None-Desk-308/trial_T20190908_125200_737896/game.tw-pddl",
+      "elapsed_seconds": 12.977827310562134
+    },
+    {
+      "num_steps": 1,
+      "won": false,
+      "reward": 0.0,
+      "history": [
+        {
+          "step": 1,
+          "action": "look",
+          "observation": [
+            "You are in the middle of a room. Looking quickly around you, you see nothing."
+          ],
+          "won": false
+        }
+      ],
+      "game_index": 1,
+      "game_file": "/workspace/data/alf_data/json_2.1.1/valid_unseen/pick_and_place_simple-Mug-None-Desk-308/trial_T20190909_203041_433487/game.tw-pddl",
+      "elapsed_seconds": 6.556634426116943
+    },
+    {
+      "num_steps": 1,
+      "won": false,
+      "reward": 0.0,
+      "history": [
+        {
+          "step": 1,
+          "action": "Alternatively, the user might need to use",
+          "observation": [
+            "Nothing happens."
+          ],
+          "won": false
+        }
+      ],
+      "game_index": 2,
+      "game_file": "/workspace/data/alf_data/json_2.1.1/valid_unseen/pick_and_place_simple-Mug-None-Desk-308/trial_T20190909_210238_431966/game.tw-pddl",
+      "elapsed_seconds": 11.284844636917114
+    },
+    {
+      "num_steps": 1,
+      "won": false,
+      "reward": 0.0,
+      "history": [
+        {
+          "step": 1,
+          "action": "go to drawer 1",
+          "observation": [
+            "You arrive at drawer 1. The drawer 1 is closed."
+          ],
+          "won": false
+        }
+      ],
+      "game_index": 3,
+      "game_file": "/workspace/data/alf_data/json_2.1.1/valid_unseen/pick_and_place_simple-Pencil-None-Shelf-308/trial_T20190908_121952_610012/game.tw-pddl",
+      "elapsed_seconds": 9.39999270439148
+    },
+    {
+      "num_steps": 1,
+      "won": false,
+      "reward": 0.0,
+      "history": [
+        {
+          "step": 1,
+          "action": "go to drawer 1",
+          "observation": [
+            "You arrive at drawer 1. The drawer 1 is closed."
+          ],
+          "won": false
+        }
+      ],
+      "game_index": 4,
+      "game_file": "/workspace/data/alf_data/json_2.1.1/valid_unseen/pick_and_place_simple-Pencil-None-Shelf-308/trial_T20190908_122024_052056/game.tw-pddl",
+      "elapsed_seconds": 9.542936325073242
+    },
+    {
+      "num_steps": 1,
+      "won": false,
+      "reward": 0.0,
+      "history": [
+        {
+          "step": 1,
+          "action": "go to drawer 1",
+          "observation": [
+            "You arrive at drawer 1. The drawer 1 is closed."
+          ],
+          "won": false
+        }
+      ],
+      "game_index": 5,
+      "game_file": "/workspace/data/alf_data/json_2.1.1/valid_unseen/pick_and_place_simple-Pencil-None-Shelf-308/trial_T20190908_122154_042763/game.tw-pddl",
+      "elapsed_seconds": 9.524552583694458
+    },
+    {
+      "num_steps": 1,
+      "won": false,
+      "reward": 0.0,
+      "history": [
+        {
+          "step": 1,
+          "action": "But",
+          "observation": [
+            "Nothing happens."
+          ],
+          "won": false
+        }
+      ],
+      "game_index": 6,
+      "game_file": "/workspace/data/alf_data/json_2.1.1/valid_unseen/pick_and_place_simple-PepperShaker-None-Drawer-10/trial_T20190906_184021_215264/game.tw-pddl",
+      "elapsed_seconds": 12.071859121322632
+    },
+    {
+      "num_steps": 1,
+      "won": false,
+      "reward": 0.0,
+      "history": [
+        {
+          "step": 1,
+          "action": "But how? The current observation doesn't mention it. So maybe the peppershaker is in one of the cabinets. So the first step is to check each cabinet to see if there's a peppershaker. The admissible actions include going to cabinets. So the next logical step is to go to cabinet 1, 2, 3, etc., to check. But since the user hasn't provided any prior steps, the initial action would be to go to a cabinet to check. But which one? Maybe start with cabinet 1. Alternatively, maybe the peppershaker is in the sinkbasin or somewhere else. But without more info, it's hard to tell. The best approach is to check the cabinets first. So the next action would be to go to cabinet 1, then check if there's a peppershaker there. If not, proceed to the next cabinet. But since the user hasn't provided any prior steps, the first action is to go to a cabinet to check for the peppershaker.",
+          "observation": [
+            "Nothing happens."
+          ],
+          "won": false
+        }
+      ],
+      "game_index": 7,
+      "game_file": "/workspace/data/alf_data/json_2.1.1/valid_unseen/pick_and_place_simple-PepperShaker-None-Drawer-10/trial_T20190918_154326_823501/game.tw-pddl",
+      "elapsed_seconds": 12.113210439682007
+    },
+    {
+      "num_steps": 1,
+      "won": false,
+      "reward": 0.0,
+      "history": [
+        {
+          "step": 1,
+          "action": "But",
+          "observation": [
+            "Nothing happens."
+          ],
+          "won": false
+        }
+      ],
+      "game_index": 8,
+      "game_file": "/workspace/data/alf_data/json_2.1.1/valid_unseen/pick_and_place_simple-PepperShaker-None-Drawer-10/trial_T20190918_154424_844749/game.tw-pddl",
+      "elapsed_seconds": 12.033416032791138
+    },
+    {
+      "num_steps": 1,
+      "won": false,
+      "reward": 0.0,
+      "history": [
+        {
+          "step": 1,
+          "action": "Alternatively, maybe the saltshaker is on a countertop or somewhere else. But the user hasn't mentioned any items yet. So the next logical step is to check the inventory to see if the saltshaker is already there. If it's not, then the user needs to look around to find it. But since the initial observation doesn't mention any items, maybe the saltshaker is not in the inventory yet. So the user should check the inventory first. But wait, the task is to put the saltshaker on a cabinet, so maybe the user needs to find the saltshaker first. So the first action should be to check the inventory. If the saltshaker is not there, then the user needs to look around the room to find it. But since the current step is the first one, the user might need to look around first. However, the admissible actions include 'look', which would show the surroundings. But the initial observation already shows the surroundings. So maybe the user should check the inventory first. But the inventory action would list what's in the user's possession. If the saltshaker is not there, then the user needs to find it elsewhere. So the next step would be to look around to find the saltshaker. But the user hasn't taken any steps yet. So the first action should be to look around to see if the saltshaker is present. But the initial observation already shows the room's contents. Wait, the initial observation includes the list of objects, but not their locations. So maybe the user needs to check where the saltshaker is.",
+          "observation": [
+            "Nothing happens."
+          ],
+          "won": false
+        }
+      ],
+      "game_index": 9,
+      "game_file": "/workspace/data/alf_data/json_2.1.1/valid_unseen/pick_and_place_simple-SaltShaker-None-Cabinet-10/trial_T20190906_191429_743650/game.tw-pddl",
+      "elapsed_seconds": 11.9219388961792
+    }
+  ]
+}

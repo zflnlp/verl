@@ -1,0 +1,19 @@
+{
+  "num_tasks": 100,
+  "seed": 42,
+  "train_size": 80,
+  "test_size": 20,
+  "categories": [
+    "chemistry",
+    "biology",
+    "physics",
+    "earth-science"
+  ],
+  "tasks": [
+    "circuit-building",
+    "circuit-building",
+    "crystallization",
+    "germination-test",
+    "chemistry-mix"
+  ]
+}
