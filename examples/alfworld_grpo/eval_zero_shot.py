@@ -218,18 +218,20 @@ def main():
 
     args = parser.parse_args()
 
-    # Resolve task type
-    if args.task_type not in TASK_TYPE_MAP:
-        print(f"Unknown task type: {args.task_type}")
-        print(f"Available: {list(TASK_TYPE_MAP.keys())}")
-        return
-
-    internal_name, task_type_id = TASK_TYPE_MAP[args.task_type]
+    # Determine task types to evaluate
+    if args.all_task_types:
+        task_types_to_eval = list(TASK_TYPE_MAP.keys())
+    else:
+        if args.task_type not in TASK_TYPE_MAP:
+            print(f"Unknown task type: {args.task_type}")
+            print(f"Available: {list(TASK_TYPE_MAP.keys())}")
+            return
+        task_types_to_eval = [args.task_type]
 
     # Setup output directory
     if args.output_dir is None:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-        args.output_dir = f"eval_results/alfworld_{args.task_type}_{timestamp}"
+        args.output_dir = f"eval_results/alfworld_{timestamp}"
     os.makedirs(args.output_dir, exist_ok=True)
 
     print(f"Loading model: {args.model_path}")
