@@ -4,7 +4,7 @@
 基于 verl 框架为 ScienceWorld benchmark 构建 GRPO 训练管线，训练 Qwen3-1.7B 模型完成科学实验任务。
 
 ## 当前状态
-**阶段**: GRPO 训练已跑通，正在调试奖励和优化训练
+**阶段**: 数据划分完成，准备运行 GRPO 训练
 
 ## 已完成工作
 
@@ -48,25 +48,32 @@ Once you've finished your reasoning, you should choose a valid action for the cu
 ### 4. Zero-shot 评估 ✅
 - 任务: boil
 - 1.7B 分数: 0.0（预期，模型不输出 `<action>` 标签）
+- 14B 分数: 1.0（variation 2 得 3 分，其他 0 分）
 - 速度: ~85秒/episode（新 prompt 格式后提速 4 倍）
-- 待测试: 14B 模型（预期分数 > 0）
 
 ### 5. 训练数据生成 ✅
+使用 ScienceWorld 内置 train/dev/test 划分：
 ```bash
 python examples/scienceworld_grpo/data_preprocess.py \
     --local_save_dir /workspace/data/scienceworld_real \
     --task_name boil \
-    --num_variations 30 \
     --use_real_env
 ```
-- 训练集: 24 个任务
-- 测试集: 6 个任务
+
+**数据划分（boil 任务 30 个 variations）**：
+| 集合 | 数量 | 比例 | 用途 |
+|------|------|------|------|
+| Train | 14 | 46.7% | GRPO 训练 |
+| Dev | 7 | 23.3% | 训练中验证 |
+| Test | 9 | 30.0% | 最终评估 |
+
 - 保存位置: `/workspace/data/scienceworld_real/`
+- 元数据: `task_metadata.json`（包含每个集合的 variation 索引）
 
 ### 6. GRPO 训练已跑通 ✅
 ```bash
 conda activate verl
-bash examples/scienceworld_grpo/run_real.sh \
+CUDA_VISIBLE_DEVICES=0 bash examples/scienceworld_grpo/run_real.sh \
     data.train_batch_size=4 \
     actor_rollout_ref.actor.ppo_mini_batch_size=4
 ```
@@ -87,38 +94,25 @@ bash examples/scienceworld_grpo/run_real.sh \
 
 ## 待完成工作
 
-### 7. 测试 14B 模型 zero-shot ⏳
+### 7. 重新训练（使用正确的 train/dev/test 划分）⏳
 ```bash
-python examples/scienceworld_grpo/eval_zero_shot.py \
-    --model_path /workspace/models/Qwen3-14B/ \
-    --task_name boil \
-    --num_variations 3 \
-    --max_steps 10
-```
-验证 eval 脚本正确性，预期 14B 模型得分 > 0
-
-### 8. 增加训练数据量
-```bash
-python examples/scienceworld_grpo/data_preprocess.py \
-    --local_save_dir /workspace/data/scienceworld_real \
-    --task_name boil \
-    --num_variations 100 \
-    --use_real_env
+conda activate verl
+CUDA_VISIBLE_DEVICES=0 bash examples/scienceworld_grpo/run_real.sh \
+    data.train_batch_size=4 \
+    actor_rollout_ref.actor.ppo_mini_batch_size=4
 ```
 
-### 9. Checkpoint 格式转换
-verl checkpoint 是 `.pt` 格式，需要转换为 HuggingFace 格式才能用 eval 脚本测试：
-```python
-# 加载 base 模型 + 加载 checkpoint 权重 + 保存为 HuggingFace 格式
-```
+### 8. Checkpoint 格式转换
+verl checkpoint 是 `.pt` 格式，需要转换为 HuggingFace 格式才能用 eval 脚本测试
 
-### 10. 训练后评估
-- 用训练后的模型重新跑 zero-shot 评估
-- 对比 baseline（0.0）和训练后的分数
+### 9. 训练后评估
+- 用训练后的模型在 test set（9 个 variations）上评估
+- 报告 Average Score (0-100) 和 Success Rate (%)
+- 对比 baseline（1.7B: 0.0, 14B: 1.0）
 
 ## 关键文件
 - `eval_zero_shot.py` — 零样本评估脚本
-- `data_preprocess.py` — 数据预处理脚本
+- `data_preprocess.py` — 数据预处理脚本（使用 ScienceWorld 内置划分）
 - `reward_function.py` — 奖励函数（直接调用 ScienceWorld 环境）
 - `run_mock.sh` — Mock 训练脚本
 - `run_real.sh` — 真实训练脚本
@@ -149,6 +143,7 @@ verl checkpoint 是 `.pt` 格式，需要转换为 HuggingFace 格式才能用 e
 | 单轮生成 + reward function 执行 | 比多轮交互更简单、可靠 |
 | 使用 Qwen3-1.7B | 用户指定，显存友好 |
 | boil 任务 | 简单经典，适合验证管线 |
+| ScienceWorld 内置划分 | 官方标准，论文可直接引用 |
 
 ## 注意事项
 - ScienceWorld Java 服务器有时会变僵尸进程，需要 `kill -9` 清理
@@ -158,6 +153,5 @@ verl checkpoint 是 `.pt` 格式，需要转换为 HuggingFace 格式才能用 e
 - 多轮交互需要安装 sglang（当前未安装）
 
 ## 恢复指令
-1. 测试 14B 模型: `python examples/scienceworld_grpo/eval_zero_shot.py --model_path /workspace/models/Qwen3-14B/ --task_name boil --num_variations 3 --max_steps 10`
-2. 增加数据量: `python examples/scienceworld_grpo/data_preprocess.py --local_save_dir /workspace/data/scienceworld_real --task_name boil --num_variations 100 --use_real_env`
-3. 重新训练: `bash examples/scienceworld_grpo/run_real.sh data.train_batch_size=8`
+1. 运行训练: `CUDA_VISIBLE_DEVICES=0 bash examples/scienceworld_grpo/run_real.sh data.train_batch_size=4 actor_rollout_ref.actor.ppo_mini_batch_size=4`
+2. 评估模型: `python examples/scienceworld_grpo/eval_zero_shot.py --model_path <checkpoint_path> --task_name boil --num_variations 9 --max_steps 10`
