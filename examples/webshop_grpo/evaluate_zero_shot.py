@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Zero-shot evaluation of Qwen3-1.7B on WebShop.
+Zero-shot evaluation on WebShop.
 
 Usage:
     python examples/webshop_grpo/evaluate_zero_shot.py \
@@ -57,7 +57,7 @@ def generate_action(model, tokenizer, prompt: str, max_new_tokens: int = 500) ->
 
 def parse_action(response: str) -> str:
     """Parse the action from the model's response.
-    
+
     Expects format: <action>search[query]</action> or <action>click[button]</action>
     """
     # Try to extract action from <action> tags
@@ -72,7 +72,7 @@ def parse_action(response: str) -> str:
         # If it's just "buy", convert to click[buy]
         if action.lower() == 'buy':
             return 'click[buy]'
-    
+
     # Fallback: try to find action patterns directly
     patterns = [
         r'(search\[[^\]]+\])',
@@ -82,12 +82,107 @@ def parse_action(response: str) -> str:
         match = re.search(pattern, response, re.IGNORECASE)
         if match:
             return match.group(1)
-    
+
     # Last resort: check for "buy" keyword
     if 'buy' in response.lower():
         return 'click[buy]'
-    
+
     return ""
+
+
+def extract_instruction(observation: str) -> str:
+    """Extract the task instruction from WebShop observation.
+
+    WebShop observations typically start with:
+        Instruction:  <instruction text>  [SEP]
+    The instruction may span multiple lines.
+    """
+    # Try "Instruction:" followed by "[SEP]"
+    match = re.search(r'Instruction:\s*(.*?)\[SEP\]', observation, re.DOTALL)
+    if match:
+        instruction = match.group(1).strip()
+        # Collapse whitespace
+        instruction = re.sub(r'\s+', ' ', instruction)
+        if instruction:
+            return instruction
+
+    # Try extracting from the first line if it looks like an instruction
+    first_line = observation.split('\n')[0].strip()
+    if first_line and len(first_line) > 10 and 'Instruction' not in first_line:
+        # Might be the instruction directly
+        pass
+
+    return ""
+
+
+def extract_clickable_elements(observation: str) -> List[str]:
+    """Extract actual clickable elements from WebShop observation.
+
+    WebShop shows clickable elements in square brackets like:
+        [B07XYZ123], [Next >], [Buy Now], [Back to Search], [Prev <]
+    Also handles ASIN-style product IDs.
+    """
+    # Find all bracketed elements: [text]
+    elements = re.findall(r'\[([^\]]+)\]', observation)
+    # Filter out very long elements (likely not buttons) and empty ones
+    elements = [e.strip() for e in elements if e.strip() and len(e.strip()) < 50]
+    return elements
+
+
+def _get_available_actions(observation: str) -> str:
+    """Extract available actions from the current observation.
+
+    Paper defines two action types:
+    - search[<query>]: Search for products using a text query (only when search bar present)
+    - click[<button name>]: Click on interactive elements (product links, filter buttons, pagination)
+
+    We extract actual clickable elements from the observation to show the model
+    what it can actually click on.
+    """
+    actions = []
+
+    # search is available when search bar is present (usually on search results page)
+    if 'search' in observation.lower() or 'Search' in observation:
+        actions.append('search[<query>]')
+
+    # Extract actual clickable elements from the observation
+    elements = extract_clickable_elements(observation)
+
+    # Categorize elements
+    product_ids = []
+    buttons = []
+    for elem in elements:
+        elem_lower = elem.lower()
+        # Skip instruction-like text in brackets
+        if len(elem) > 30:
+            continue
+        # Product IDs typically start with B followed by digits, or are ASINs
+        if re.match(r'^B\d+$', elem) or re.match(r'^[A-Z0-9]{10}$', elem):
+            product_ids.append(elem)
+        # Navigation and action buttons
+        elif elem_lower in ['next >', 'next', 'prev <', 'prev', 'back to search',
+                            'buy now', 'buy', 'add to cart']:
+            buttons.append(elem)
+        # Filter options (ratings, price ranges, etc.)
+        elif any(kw in elem_lower for kw in ['star', 'rating', 'price', '$']):
+            buttons.append(elem)
+        # Other short clickable elements
+        elif len(elem) < 20:
+            buttons.append(elem)
+
+    # Add product click actions
+    for pid in product_ids[:5]:  # Limit to first 5
+        actions.append(f'click[{pid}]')
+
+    # Add button click actions
+    for btn in buttons[:10]:  # Limit to first 10
+        actions.append(f'click[{btn}]')
+
+    # If no specific actions detected, provide defaults
+    if len(actions) <= 1:
+        actions.append('click[<button>]')
+
+    return "\n".join(f"  {a}" for a in actions)
 
 
 def create_prompt(task_description: str, step_count: int, history: List[Dict], current_observation: str) -> str:
@@ -104,7 +199,6 @@ def create_prompt(task_description: str, step_count: int, history: List[Dict], c
     action_history = "\n".join(history_lines) if history_lines else "(no history)"
 
     # Determine available actions based on current page
-    # WebShop typically has: search bar, product links, filter buttons, pagination, buy button
     available_actions = _get_available_actions(current_observation)
 
     prompt = f"""You are an expert autonomous agent operating in the WebShop e-commerce environment. Your task is to: {task_description}.
@@ -125,53 +219,20 @@ Now it's your turn to take one action for the current step. You should first rea
     return prompt
 
 
-def _get_available_actions(observation: str) -> str:
-    """Extract available actions from the current observation.
+def evaluate_episode(model, tokenizer, env, initial_obs: str, task_description: str,
+                     max_steps: int = 15, verbose: bool = False) -> Tuple[float, List[Dict]]:
+    """Evaluate a single episode.
 
-    Paper defines two action types:
-    - search[<query>]: Search for products using a text query (only when search bar present)
-    - click[<button name>]: Click on interactive elements (product links, filter buttons, pagination)
+    Args:
+        model: The language model.
+        tokenizer: The tokenizer.
+        env: The WebShop environment.
+        initial_obs: The initial observation from env.reset() (already called by caller).
+        task_description: Extracted task instruction.
+        max_steps: Maximum steps per episode.
+        verbose: If True, print model outputs for debugging.
     """
-    actions = []
-
-    # search is always available when search bar is present
-    actions.append('search[<query>]')
-
-    # Check for clickable product links
-    if re.search(r'\[B\d+\]', observation) or re.search(r'ASIN:', observation):
-        actions.append('click[<product_id>]')
-
-    # Check for filter buttons
-    if 'Rating' in observation or 'Price' in observation or 'Brand' in observation:
-        actions.append('click[<filter>]')
-
-    # Check for pagination
-    if 'Next' in observation or 'next' in observation:
-        actions.append('click[Next]')
-    if 'Prev' in observation or 'Previous' in observation:
-        actions.append('click[Prev]')
-
-    # Check for buy button (when viewing product details)
-    if 'buy' in observation.lower() or 'add to cart' in observation.lower():
-        actions.append('click[buy]')
-
-    # If no specific actions detected, provide defaults
-    if len(actions) <= 1:
-        actions.append('click[<button>]')
-
-    return "\n".join(f"  {a}" for a in actions)
-
-
-def evaluate_episode(model, tokenizer, env, task_description: str, max_steps: int = 15) -> Tuple[float, List[Dict]]:
-    """Evaluate a single episode."""
-    obs = env.reset()
-    
-    # Handle tuple observation
-    if isinstance(obs, tuple):
-        obs_text = obs[0] if isinstance(obs[0], str) else str(obs[0])
-    else:
-        obs_text = str(obs)
-    
+    obs_text = initial_obs
     history = []
     total_reward = 0.0
 
@@ -181,13 +242,20 @@ def evaluate_episode(model, tokenizer, env, task_description: str, max_steps: in
 
         # Generate response with thought and action
         response = generate_action(model, tokenizer, prompt)
-        
+
         # Parse action from response
         action = parse_action(response)
+
+        if verbose:
+            print(f"\n--- Step {step + 1} ---")
+            print(f"Model response (first 300 chars): {response[:300]}")
+            print(f"Parsed action: '{action}'")
 
         # Skip empty actions with a default
         if not action:
             action = "search[product]"
+            if verbose:
+                print(f"  -> Empty action, fallback to: {action}")
 
         # Execute action
         try:
@@ -196,6 +264,11 @@ def evaluate_episode(model, tokenizer, env, task_description: str, max_steps: in
                 obs_text = obs[0] if isinstance(obs[0], str) else str(obs[0])
             else:
                 obs_text = str(obs)
+
+            if verbose:
+                print(f"  -> Reward: {reward}, Done: {done}")
+                print(f"  -> Obs (first 200 chars): {obs_text[:200]}")
+
         except Exception as e:
             print(f"Error executing action '{action}': {e}")
             obs_text = "Error: Invalid action. Please try a different action."
@@ -206,7 +279,7 @@ def evaluate_episode(model, tokenizer, env, task_description: str, max_steps: in
         history.append({
             "step": step + 1,
             "action": action,
-            "observation": obs_text[:300],
+            "observation": obs_text[:500],
             "reward": reward,
         })
 
@@ -226,6 +299,7 @@ def main():
     parser.add_argument("--num_products", type=int, default=1000)
     parser.add_argument("--output_dir", type=str, default="results/webshop_zero_shot")
     parser.add_argument("--device", type=str, default="auto")
+    parser.add_argument("--verbose", action="store_true", help="Print model outputs for debugging")
     args = parser.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
@@ -247,30 +321,32 @@ def main():
 
     print(f"\nEvaluating {args.num_episodes} episodes...")
     for episode in tqdm(range(args.num_episodes)):
-        # Get task description from environment
+        # Reset environment ONCE per episode
         obs = env.reset()
         if isinstance(obs, tuple):
             obs_text = obs[0] if isinstance(obs[0], str) else str(obs[0])
-            # Try to extract task from second element or from observation
-            if len(obs) > 1 and obs[1]:
-                task_description = str(obs[1])
-            else:
-                task_description = ""
         else:
             obs_text = str(obs)
-            task_description = ""
-        
-        # Extract task from observation if not available
-        if not task_description and "Instruction:" in obs_text:
-            match = re.search(r'Instruction:\s*(.*?)\[SEP\]', obs_text)
-            if match:
-                task_description = match.group(1).strip()
-        
+
+        # Extract task instruction from the observation
+        task_description = extract_instruction(obs_text)
+
         if not task_description:
             task_description = "Find and purchase a product that matches the given requirements"
+            if args.verbose:
+                print(f"\n[WARNING] Could not extract instruction from observation:")
+                print(f"  First 300 chars: {obs_text[:300]}")
 
-        # Evaluate episode
-        reward, history = evaluate_episode(model, tokenizer, env, task_description, args.max_steps)
+        if args.verbose:
+            print(f"\n=== Episode {episode + 1} ===")
+            print(f"Task: {task_description[:100]}...")
+            print(f"Initial obs (first 200 chars): {obs_text[:200]}")
+
+        # Evaluate episode — pass the initial observation, don't reset again
+        reward, history = evaluate_episode(
+            model, tokenizer, env, obs_text, task_description,
+            args.max_steps, verbose=args.verbose
+        )
         rewards.append(reward)
         all_histories.append(history)
 
