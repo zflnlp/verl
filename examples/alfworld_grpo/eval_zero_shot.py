@@ -335,6 +335,9 @@ def main():
         "max_steps": args.max_steps,
         "total_wins": total_wins,
         "win_rate": win_rate,
+        "avg_steps_all": avg_steps_all,
+        "avg_steps_won": avg_steps_won,
+        "avg_steps_lost": avg_steps_lost,
         "timestamp": datetime.now().isoformat(),
         "results": results,
     }
