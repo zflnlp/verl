@@ -53,7 +53,7 @@
 | 模型 | Win Rate | 备注 |
 |------|----------|------|
 | Qwen3-1.7B | **20%** | 2 WON（12步）/ 8 LOST（30步超时） |
-| Qwen3-14B | **50%** | 5 WON（4步完成）/ 5 LOST（30步超时） |
+| Qwen3-14B | **50%** | 5 WON（4步）/ 5 LOST（30步） | 旧 prompt |
 
 - 结果路径：`/workspace/data/alfworld_eval_zero_shot_14B/results.json`
 - 1.7B 结果：`/workspace/data/alfworld_eval_zero_shot_1.7B/results.json`
