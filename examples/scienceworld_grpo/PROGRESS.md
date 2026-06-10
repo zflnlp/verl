@@ -26,17 +26,24 @@
 - `simplificationStr` 是 `load()` 参数
 
 ### 3. Prompt 格式对齐参考论文 ✅
-参考论文格式：
+**⚠️ 重要：Prompt 格式已对齐参考论文，不要修改！**
+
+参考论文格式（使用 Qwen3 系列模型，格式已验证有效）：
 ```
 Your ScienceWorld task is: {task description}
-Prior to this step, you have already taken {step count} step(s).
-Below are the most recent {history length} observations and the corresponding actions you took:
-{action history}
-You are now at step {current step} and your current observation is:
-{current observation}
+Prior to this step, you have already taken {step count} step(s). Below are the most recent {history length} observations and the corresponding actions you took: {action history}
+You are now at step {current step} and your current observation is: {current observation}
 Your valid actions of the current situation are: [{admissible actions}].
-Now it's your turn to take an action. You should first reason step-by-step about the current situation. This reasoning process MUST be enclosed within <thought> tags. Once you've finished your reasoning, you should choose a valid action for the current step and present it within <action> </action> tags.
+
+Now it's your turn to take an action.
+You should first reason step-by-step about the current situation. This reasoning process MUST be enclosed within <thought> tags.
+Once you've finished your reasoning, you should choose a valid action for the current step and present it within <action> </action> tags.
 ```
+
+**注意**：
+- 不要添加 example（保持 zero-shot）
+- 不要修改指令文本（参考论文格式已验证）
+- System message 可以保留（帮助模型遵循格式）
 
 ### 4. Zero-shot 评估 ✅
 - 任务: boil

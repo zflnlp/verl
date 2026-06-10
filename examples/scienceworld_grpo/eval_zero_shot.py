@@ -76,13 +76,13 @@ def format_prompt(task_description: str, step_count: int, history: list,
         available_actions = "look around, task"
 
     return f"""Your ScienceWorld task is: {task_description}
-Prior to this step, you have already taken {step_count - 1} step(s).
-Below are the most recent {history_length} observations and the corresponding actions you took:
-{action_history}
-You are now at step {step_count} and your current observation is:
-{observation}
+Prior to this step, you have already taken {step_count - 1} step(s). Below are the most recent {history_length} observations and the corresponding actions you took: {action_history}
+You are now at step {step_count} and your current observation is: {observation}
 Your valid actions of the current situation are: [{available_actions}].
-Now it's your turn to take an action. You should first reason step-by-step about the current situation. This reasoning process MUST be enclosed within <thought> tags. Once you've finished your reasoning, you MUST choose EXACTLY ONE valid action from the list above and present it within <action> </action> tags. Do NOT write anything after the </action> tag."""
+
+Now it's your turn to take an action.
+You should first reason step-by-step about the current situation. This reasoning process MUST be enclosed within <thought> tags.
+Once you've finished your reasoning, you should choose a valid action for the current step and present it within <action> </action> tags."""
 
 
 def run_episode(env, model, tokenizer, task_name: str, variation: int,
@@ -222,11 +222,14 @@ def main():
 
     # Summary
     avg_score = total_score / num_variations if num_variations > 0 else 0.0
+    total_steps = sum(r["num_steps"] for r in results)
+    avg_steps = total_steps / num_variations if num_variations > 0 else 0.0
     print(f"\n{'='*50}")
     print(f"Task: {args.task_name}")
     print(f"Variations tested: {num_variations}")
     print(f"Average reward: {avg_score:.3f}")
     print(f"Average score (0-100): {avg_score * 100:.1f}")
+    print(f"Average action rounds per task: {avg_steps:.1f}")
     print(f"{'='*50}")
 
     # Save results
@@ -238,6 +241,7 @@ def main():
         "simplifications_preset": args.simplifications_preset,
         "average_reward": avg_score,
         "average_score": avg_score * 100,
+        "average_action_rounds": avg_steps,
         "timestamp": datetime.now().isoformat(),
         "results": results,
     }
