@@ -296,7 +296,8 @@ def main():
     parser.add_argument("--model_path", type=str, default="/workspace/models/Qwen3-1.7B")
     parser.add_argument("--num_episodes", type=int, default=50)
     parser.add_argument("--max_steps", type=int, default=15)
-    parser.add_argument("--num_products", type=int, default=1000)
+    parser.add_argument("--num_products", type=int, default=1000,
+                        help="Number of products: 100, 1000, 100000, or -1 for all")
     parser.add_argument("--output_dir", type=str, default="results/webshop_zero_shot")
     parser.add_argument("--device", type=str, default="auto")
     parser.add_argument("--verbose", action="store_true", help="Print model outputs for debugging")
@@ -313,7 +314,9 @@ def main():
     from web_agent_site.envs import WebAgentTextEnv
 
     # Create environment
-    env = gym.make('WebAgentTextEnv-v0', observation_mode='text', num_products=args.num_products)
+    # WebShop supports num_products: 100, 1000, 100000, or None (all)
+    num_products = args.num_products if args.num_products > 0 else None
+    env = gym.make('WebAgentTextEnv-v0', observation_mode='text', num_products=num_products)
 
     # Evaluate
     rewards = []
@@ -378,7 +381,7 @@ def main():
         "model_path": args.model_path,
         "num_episodes": args.num_episodes,
         "max_steps": args.max_steps,
-        "num_products": args.num_products,
+        "num_products": num_products,
         "avg_reward": avg_reward,
         "max_reward": max_reward,
         "min_reward": min_reward,
