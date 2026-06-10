@@ -42,6 +42,9 @@ def generate_real_dataset_with_splits(task_name: str) -> dict:
 
     env = ScienceWorldEnv()
 
+    # Must load a task first to initialize variations
+    env.load(task_name, 0)
+
     splits = {}
     for split_name, get_fn in [
         ("train", env.get_variations_train),
