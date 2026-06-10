@@ -26,17 +26,33 @@ from scienceworld import ScienceWorldEnv
 
 
 def extract_action(text: str) -> str:
-    """Extract action from <action> tags or fallback to last line."""
+    """Extract action from <action> tags with robust fallback."""
+    # Primary: extract from <action> tags
     match = re.search(r'<action>\s*(.*?)\s*</action>', text, re.IGNORECASE | re.DOTALL)
     if match:
         return match.group(1).strip()
-    # Fallback: try to find a known action pattern
+
+    # Fallback: look for common ScienceWorld action patterns
+    action_patterns = [
+        r'(?:go to|go)\s+\w+',
+        r'(?:take|get|pick up)\s+.+?(?:\s+from\s+.+)?',
+        r'(?:open|close)\s+\w+',
+        r'(?:use|toggle|activate|turn on|turn off)\s+\w+',
+        r'(?:pour|put|place)\s+.+?(?:\s+(?:in|into|on)\s+.+)?',
+        r'(?:examine|look at|look)\s*\w*',
+        r'(?:mix|stir)\s+\w+',
+        r'(?:wait|task|inventory|look around)',
+    ]
+
     lines = text.strip().split("\n")
     for line in reversed(lines):
-        line = line.strip()
-        if line and not line.startswith("<") and not line.startswith("#"):
-            return line
-    return text.strip()
+        line = line.strip().lower()
+        for pattern in action_patterns:
+            if re.search(pattern, line, re.IGNORECASE):
+                return line
+
+    # Last resort: return "look around" as safe default
+    return "look around"
 
 
 def format_prompt(task_description: str, step_count: int, history: list,
@@ -66,7 +82,11 @@ Below are the most recent {history_length} observations and the corresponding ac
 You are now at step {step_count} and your current observation is:
 {observation}
 Your valid actions of the current situation are: [{available_actions}].
-Now it's your turn to take an action. You should first reason step-by-step about the current situation. This reasoning process MUST be enclosed within <thought> tags. Once you've finished your reasoning, you should choose a valid action for the current step and present it within <action> </action> tags."""
+Now it's your turn to take an action. You should first reason step-by-step about the current situation. This reasoning process MUST be enclosed within <thought> tags. Once you've finished your reasoning, you MUST choose EXACTLY ONE valid action from the list above and present it within <action> </action> tags. Do NOT write anything after the </action> tag.
+
+Example response:
+<thought>I need to find water. The sink is available, so I should go to the sink.</thought>
+<action>go to sink</action>"""
 
 
 def run_episode(env, model, tokenizer, task_name: str, variation: int,
@@ -89,6 +109,7 @@ def run_episode(env, model, tokenizer, task_name: str, variation: int,
 
         # Generate response
         messages = [
+            {"role": "system", "content": "You are a helpful assistant that completes science tasks. You MUST always respond with exactly one <thought>...</thought> block followed by exactly one <action>...</action> block. The action must be chosen from the provided valid actions list."},
             {"role": "user", "content": prompt},
         ]
 
