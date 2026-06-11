@@ -1,0 +1,17 @@
+tools:
+  - class_name: "verl.tools.scienceworld_tool.ScienceWorldTool"
+    config:
+      type: native
+      use_mock: false
+    tool_schema:
+      type: "function"
+      function:
+        name: "action"
+        description: "Execute an action in the ScienceWorld laboratory environment."
+        parameters:
+          type: "object"
+          properties:
+            command:
+              type: "string"
+              description: "The action command to execute (e.g., 'look around', 'examine beaker', 'take flask from table', 'pour water into pot')"
+          required: ["command"]
