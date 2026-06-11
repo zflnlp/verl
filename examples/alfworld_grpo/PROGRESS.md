@@ -219,6 +219,30 @@ GRPO 训练完成后，用同样的 `--all_task_types` 评估，对比 baseline 
 
 ---
 
+## 开发工作流程
+
+**重要**：实验在服务器 Docker 环境中运行，不在本地 Mac 上！
+
+1. **本地 Mac**：修改代码、调试、提交到 GitHub
+2. **GitHub**：代码仓库（`webshop-grpo-v0.4.1` 分支）
+3. **服务器 Docker**：拉取代码、生成数据、运行训练
+
+```bash
+# 服务器上拉取最新代码
+cd /workspace/verl
+git pull origin webshop-grpo-v0.4.1
+
+# 生成数据
+python examples/alfworld_grpo/data_preprocess.py \
+    --local_save_dir /workspace/data/alfworld \
+    --num_tasks 100 --seed 42
+
+# 运行训练
+bash examples/alfworld_grpo/run_mock.sh
+```
+
+---
+
 ## 环境信息
 
 | 项目 | 路径/版本 |
