@@ -303,6 +303,9 @@ Once you've finished your reasoning, you should choose an admissible action for 
             "extra_info": {
                 "task_type": task_type,
                 "game_file": task.get("game_file", ""),
+                "interaction_kwargs": {
+                    "ground_truth": task,
+                },
             },
         })
 

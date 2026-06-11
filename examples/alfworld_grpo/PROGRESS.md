@@ -22,7 +22,8 @@
 | rollout.name | vllm | sglang |
 | multi_turn.enable | True | True |
 | max_assistant_turns | 30 | 30 |
-| 响应长度 | 501 tokens (截断) | 预期 50-150 tokens/轮 |
+| max_response_length | 512 | 6144 |
+| 响应长度 | 501 tokens (截断) | 预期多轮对话历史 |
 
 ### 使用方法
 ```bash
@@ -31,6 +32,38 @@ bash examples/alfworld_grpo/run_sglang_multiturn.sh
 
 # vLLM 单轮训练（旧）
 bash examples/alfworld_grpo/run_mock.sh
+```
+
+### 为什么 max_response_length 需要 6144？
+
+在多轮交互中，`max_response_length` 需要容纳整个对话历史：
+- 模型的 thought + action (~100-200 tokens)
+- 环境的 observation (~100-200 tokens)
+- 重复 30 轮 = 6000-12000 tokens
+
+参考 GSM8K 示例：`max_response_length=$((1024 * 3))` = 3072 tokens
+
+### 为什么需要 interaction_kwargs？
+
+GSM8K 示例的数据格式包含 `interaction_kwargs`：
+```python
+"extra_info": {
+    "interaction_kwargs": {
+        "query": question,
+        "ground_truth": solution,
+    },
+},
+```
+
+这是传递给 `interaction.start_interaction()` 的参数，用于初始化交互环境。
+
+ALFWorld 需要：
+```python
+"extra_info": {
+    "interaction_kwargs": {
+        "ground_truth": task,  # 包含 task_type, goal, game_file
+    },
+},
 ```
 
 ---
