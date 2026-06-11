@@ -42,6 +42,7 @@ actor_rollout_ref:
     gpu_memory_utilization: 0.6
     n: 4
     log_prob_micro_batch_size_per_gpu: 8
+    max_num_batched_tokens: 16384
     multi_turn:
       enable: False
   ref:
