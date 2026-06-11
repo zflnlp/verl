@@ -38,6 +38,7 @@ actor_rollout_ref:
       optimizer_offload: False
   rollout:
     name: sglang
+    tensor_model_parallel_size: 1
     gpu_memory_utilization: 0.7
     n: 4
     log_prob_micro_batch_size_per_gpu: 8

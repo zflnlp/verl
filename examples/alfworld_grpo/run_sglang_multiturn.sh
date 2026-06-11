@@ -33,6 +33,7 @@ ENTROPY_COEFF=${ENTROPY_COEFF:-0}
 
 # Rollout configuration
 ROLLOUT_N=${ROLLOUT_N:-4}
+ROLLOUT_TP=${ROLLOUT_TP:-1}
 ROLLOUT_GPU_MEM_UTIL=${ROLLOUT_GPU_MEM_UTIL:-0.7}
 
 # Training schedule
@@ -78,6 +79,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=${MICRO_BATCH_SIZE} \
     actor_rollout_ref.actor.kl_loss_coef=${KL_LOSS_COEF} \
     actor_rollout_ref.actor.entropy_coeff=${ENTROPY_COEFF} \
+    actor_rollout_ref.rollout.tensor_model_parallel_size=${ROLLOUT_TP} \
     actor_rollout_ref.rollout.gpu_memory_utilization=${ROLLOUT_GPU_MEM_UTIL} \
     actor_rollout_ref.rollout.n=${ROLLOUT_N} \
     actor_rollout_ref.rollout.multi_turn.tool_config_path="${CONFIG_PATH}/alfworld_tool_config.yaml" \
