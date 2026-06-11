@@ -1,8 +1,8 @@
 # ALFWorld GRPO 项目进度
 
-## 当前状态：Zero-shot baseline 已建立，等待 GPU 空闲跑 Mock 训练
+## 当前状态：全任务 Zero-shot 评估中（1.7B），Mock 训练等待 GPU 空闲
 
-最后更新：2026-06-09
+最后更新：2026-06-10
 
 ---
 
@@ -51,7 +51,8 @@
 | Qwen3-14B | 旧 prompt | 50% | 4.0 | 30.0 |
 | Qwen3-14B | 新 prompt（文献版） | 40% | 6.8 | 30.0 |
 
-- 结果路径：`/workspace/data/alfworld_eval_zero_shot_1.7B/`、`alfworld_eval_zero_shot_14B_v2/`
+- 单任务结果：`/workspace/data/alfworld_eval_zero_shot_1.7B/`、`alfworld_eval_zero_shot_14B_v2/`
+- ⏳ 全任务评估（`--all_task_types`）进行中：`/workspace/data/alfworld_eval_1.7B_all/`
 
 ---
 
