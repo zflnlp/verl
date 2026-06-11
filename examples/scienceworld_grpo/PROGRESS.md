@@ -4,7 +4,7 @@
 基于 verl 框架为 ScienceWorld benchmark 构建 GRPO 训练管线，训练 Qwen3-1.7B 模型完成科学实验任务。
 
 ## 当前状态
-**阶段**: 扩展训练数据 + 完整训练（对齐 TCOD 论文）
+**阶段**: 扩展训练数据已完成，准备运行完整训练（对齐 TCOD 论文）
 
 ## 源码参考
 - ScienceWorld 源码: `benchmarks/ScienceWorld/`
@@ -12,32 +12,95 @@
 - alfworld 源码: `benchmarks/alfworld/`
 - 数据目录: `data/`
 
-## TCOD 论文对齐
+---
+
+## TCOD 论文参数对照表
 
 ### 参考论文
-- **TCOD: Exploring Temporal Curriculum in On-Policy Distillation for Multi-turn Autonomous Agents**
-- 作者: Jiaqi Wang 等 (Tongyi Lab, Alibaba Group)
-- 使用 Qwen3-1.7B 作为 student，Qwen3-30B-A3B-Instruct 作为 teacher
+- **标题**: TCOD: Exploring Temporal Curriculum in On-Policy Distillation for Multi-turn Autonomous Agents
+- **作者**: Jiaqi Wang, Wenhao Zhang, Weijie Shi, Yaliang Li, James Cheng (Tongyi Lab, Alibaba Group)
+- **论文使用**: Qwen3-1.7B 作为 student，Qwen3-30B-A3B-Instruct 作为 teacher
+- **算法**: On-Policy Distillation (OPD)，我们使用 GRPO（不同算法，但训练配置对齐）
 
-### 论文中的 ScienceWorld 配置
-| 配置项 | 论文值 | 我们的值 | 状态 |
-|--------|--------|----------|------|
-| 任务类型 | 30 种 | 30 种 | ✅ 已对齐 |
-| Max Steps | 30 | 30 | ✅ 已对齐 |
-| Max Prompt Tokens | 10,240 | 10,240 | ✅ 已对齐 |
-| Max Response Tokens | 512 | 512 | ✅ 已对齐 |
-| Learning Rate | 1e-6 | 1e-6 | ✅ 已对齐 |
-| Batch Size | 64 | 64 | ✅ 已对齐 |
-| Total Training Steps | 250 | 250 | ✅ 已对齐 |
+### 论文 Table 4: Training Hyperparameters 详细对照
+
+#### 算法配置
+| 参数 | 论文值 (OPD) | 我们的值 (GRPO) | 说明 |
+|------|-------------|-----------------|------|
+| Algorithm type | On-Policy Distillation | GRPO | 不同算法 |
+| Advantage function | Multi-turn OPD | GRPO | 不同算法 |
+| KL coefficient | 1.0 | 0.001 | OPD 的 distillation loss vs GRPO 的 KL penalty |
+| Learning rate | 1×10⁻⁶ | 1×10⁻⁶ | ✅ 已对齐 |
+| Gradient clipping | 1.0 | 1.0 | ✅ 已对齐 |
+| Repeat times | 1 | 1 | ✅ 已对齐 |
+
+#### 训练配置
+| 参数 | 论文值 | 我们的值 | 状态 |
+|------|--------|----------|------|
+| Total training steps | 250 | 250 | ✅ 已对齐 |
+| Batch size | 16 | 16 | ✅ 已对齐 |
+| Train batch size | 64 | 64 | ✅ 已对齐 |
+| Save interval | 250 | 250 | ✅ 已对齐 |
+| Evaluation interval | 5 steps | 5 steps | ✅ 已对齐 |
+| Seed | 42 | 42 | ✅ 已对齐 |
+
+#### 模型配置
+| 参数 | 论文值 | 我们的值 | 状态 |
+|------|--------|----------|------|
+| Max prompt tokens | 10,240 | 10,240 | ✅ 已对齐 |
+| Max response tokens | 512 | 512 | ✅ 已对齐 |
+
+#### 推理配置
+| 参数 | 论文值 | 我们的值 | 状态 |
+|------|--------|----------|------|
+| Temperature (training) | 1.0 | 1.0 | ✅ 已对齐 |
+| Temperature (evaluation) | 0.4 | 0.4 | ✅ 已对齐 |
+| Logprobs | Enabled (all tokens) | Enabled | ✅ 已对齐 |
+
+#### 环境配置
+| 参数 | 论文值 | 我们的值 | 状态 |
+|------|--------|----------|------|
+| ScienceWorld max steps | 30 | 30 | ✅ 已对齐 |
+| History length | 2 steps | 3 steps | ⚠️ 略有不同 |
+
+#### 硬件配置（因硬件不同而异）
+| 参数 | 论文值 | 我们的值 | 说明 |
+|------|--------|----------|------|
+| Number of nodes | 1 | 1 | ✅ |
+| GPUs per node | 8×H20 (96GB) | 1×H100 (80GB) | 硬件不同 |
+| Tensor parallel size | 2 | 1 | 单卡不需要 |
+| Sequence parallel size | 2 (Ulysses) | 无 | 单卡不需要 |
+| Max tokens per GPU | 16,384 | 16,384 | ✅ 已对齐 |
+| GPU memory utilization | 0.7 | 0.7 | ✅ 已对齐 |
+| Data type | BFloat16 | BFloat16 | ✅ 已对齐 |
 
 ### 论文结果（ScienceWorld）
 | 模型 | 方法 | Success Rate |
 |------|------|-------------|
 | Qwen3-30B (Teacher) | — | 18.42% |
+| Qwen3-1.7B | Zero-Shot | 0.00% |
+| Qwen3-1.7B | SFT | 0.00% |
 | Qwen3-1.7B | Vanilla OPD | 0.05% |
+| Qwen3-1.7B | TCOD-B2F (η=2) | 10.82% |
 | Qwen3-1.7B | TCOD-B2F (η=4) | **11.34%** |
+| Qwen3-1.7B | TCOD-B2F (η=6) | 10.65% |
+| Qwen3-1.7B | TCOD-F2B (η=2) | 10.45% |
+| Qwen3-1.7B | TCOD-F2B (η=4) | 9.22% |
+| Qwen3-1.7B | TCOD-F2B (η=6) | **11.08%** |
 | Qwen3-4B | Vanilla OPD | 15.95% |
 | Qwen3-4B | TCOD-F2B (η=2) | **17.85%** |
+
+### 论文评估配置 (Table 5)
+| 参数 | 论文值 | 我们的值 | 状态 |
+|------|--------|----------|------|
+| Maximum tokens | 4,096 | 4,096 | ✅ |
+| Temperature | 0.4 | 0.4 | ✅ |
+| Top-p | 1.0 | 1.0 | ✅ |
+| Max environment steps | 30 | 30 | ✅ |
+| History length | 2 steps | 3 steps | ⚠️ 略有不同 |
+| Number of workers | 8 | 1 | 硬件不同 |
+
+---
 
 ## 已完成工作
 
@@ -61,7 +124,7 @@
 ### 3. Prompt 格式对齐参考论文 ✅
 **⚠️ 重要：Prompt 格式已对齐参考论文，不要修改！**
 
-参考论文格式（使用 Qwen3 系列模型，格式已验证有效）：
+参考论文格式（论文 Section E.2 ScienceWorld Prompts）：
 ```
 Your ScienceWorld task is: {task description}
 Prior to this step, you have already taken {step count} step(s). Below are the most recent {history length} observations and the corresponding actions you took: {action history}
@@ -85,7 +148,7 @@ Once you've finished your reasoning, you should choose a valid action for the cu
 - 速度: ~85秒/episode（新 prompt 格式后提速 4 倍）
 
 ### 5. 训练数据生成 ✅
-使用 ScienceWorld 内置 train/dev/test 划分：
+**单任务（boil）数据**：
 ```bash
 python examples/scienceworld_grpo/data_preprocess.py \
     --local_save_dir /workspace/data/scienceworld_real \
@@ -93,17 +156,23 @@ python examples/scienceworld_grpo/data_preprocess.py \
     --use_real_env
 ```
 
-**数据划分（boil 任务 30 个 variations）**：
-| 集合 | 数量 | 比例 | 用途 |
-|------|------|------|------|
-| Train | 14 | 46.7% | GRPO 训练 |
-| Dev | 7 | 23.3% | 训练中验证 |
-| Test | 9 | 30.0% | 最终评估 |
+**全部 30 个任务数据**（对齐 TCOD 论文）：
+```bash
+bash examples/scienceworld_grpo/generate_all_data.sh
+```
 
-- 保存位置: `/workspace/data/scienceworld_real/`
-- 元数据: `task_metadata.json`（包含每个集合的 variation 索引）
+**数据统计（30 个任务）**：
+| 集合 | 数量 |
+|------|------|
+| Train | 3,592 |
+| Dev | 1,796 |
+| Test | 1,819 |
+| **Total** | **7,207** |
 
-### 6. GRPO 训练已跑通 ✅
+- 保存位置: `/workspace/data/scienceworld_all/`
+- 元数据: `task_metadata.json`
+
+### 5. GRPO 训练已跑通 ✅（小规模验证）
 ```bash
 conda activate verl
 CUDA_VISIBLE_DEVICES=0 bash examples/scienceworld_grpo/run_real.sh \
@@ -117,52 +186,33 @@ CUDA_VISIBLE_DEVICES=0 bash examples/scienceworld_grpo/run_real.sh \
 - 优势范围: [-0.5, +1.5]（有学习信号）
 - 奖励函数正常工作（timing_s/reward: 19.4s）
 
-**关键发现**:
-- vllm 不支持多轮交互的 async 模式（verl 需要 sglang）
-- 改为 sync 模式，reward function 直接调用 ScienceWorld 环境
-- 这是主流做法（DeepSeek-R1、Search-R1 等都用这种方式）
-- 训练数据太少（14 个样本），需要增加数据量
-
 **Checkpoint 位置**:
 `checkpoints/verl_grpo_scienceworld_real/scienceworld_real_grpo_20260610_0940/global_step_3/`
 
+### 6. 配置对齐 TCOD 论文 ✅
+已更新所有配置文件，参数与论文 Table 4/5 对齐。
+
+---
+
 ## 待完成工作
 
-### 7. 生成全部 30 个任务的训练数据 ⏳
-```bash
-# 在服务器上运行
-conda activate scienceworld
-bash examples/scienceworld_grpo/generate_all_data.sh
-```
-
-输出: `/workspace/data/scienceworld_all/`
-- train.parquet
-- val.parquet
-- test.parquet
-- task_metadata.json
-
-### 8. 运行完整训练 ⏳
+### 7. 运行完整训练 ⏳
 ```bash
 # 在服务器上运行
 conda activate verl
-bash examples/scienceworld_grpo/run_full_training.sh
+git pull
+CUDA_VISIBLE_DEVICES=1 bash examples/scienceworld_grpo/run_full_training.sh
 ```
 
-训练参数（对齐 TCOD 论文）:
-- Total steps: 250
-- Batch size: 64
-- Max prompt length: 10240
-- Max response length: 512
-- Max steps: 30
-- Learning rate: 1e-6
-
-### 9. Checkpoint 格式转换
+### 8. Checkpoint 格式转换
 verl checkpoint 是 `.pt` 格式，需要转换为 HuggingFace 格式才能用 eval 脚本测试
 
-### 10. 训练后评估
+### 9. 训练后评估
 - 用训练后的模型在 test set 上评估
 - 报告 Average Score (0-100) 和 Success Rate (%)
 - 对比 baseline（1.7B: 0.0, 14B: 1.0）
+
+---
 
 ## 关键文件
 - `eval_zero_shot.py` — 零样本评估脚本
@@ -172,6 +222,7 @@ verl checkpoint 是 `.pt` 格式，需要转换为 HuggingFace 格式才能用 e
 - `run_real.sh` — 真实训练脚本
 - `run_full_training.sh` — 完整训练脚本（对齐 TCOD 论文）
 - `generate_all_data.sh` — 数据生成脚本（所有 30 个任务）
+- `config/scienceworld_grpo.yaml` — 主训练配置
 - `verl/interactions/scienceworld_interaction.py` — 核心交互类
 - `verl/tools/scienceworld_tool.py` — action 工具
 - `benchmarks/ScienceWorld/` — ScienceWorld 源码
@@ -184,19 +235,6 @@ verl checkpoint 是 `.pt` 格式，需要转换为 HuggingFace 格式才能用 e
 
 **Fallback**: 如果没有 `<action>` 标签，返回 0 分
 
-## 训练参数（对齐 TCOD 论文）
-| 参数 | 值 |
-|------|-----|
-| rollout_n | 4 |
-| actor_lr | 1e-6 |
-| kl_loss_coef | 0.001 |
-| train_batch_size | 64 |
-| gpu_memory_utilization | 0.7 |
-| max_prompt_length | 10240 |
-| max_response_length | 512 |
-| max_steps | 30 |
-| total_steps | 250 |
-
 ## 技术决策
 | 决策 | 原因 |
 |------|------|
@@ -205,6 +243,7 @@ verl checkpoint 是 `.pt` 格式，需要转换为 HuggingFace 格式才能用 e
 | 使用 Qwen3-1.7B | 用户指定，显存友好 |
 | 全部 30 个任务 | 对齐 TCOD 论文 |
 | ScienceWorld 内置划分 | 官方标准，论文可直接引用 |
+| GRPO 而非 OPD | verl 框架原生支持 GRPO |
 
 ## 注意事项
 - ScienceWorld Java 服务器有时会变僵尸进程，需要 `kill -9` 清理
@@ -212,6 +251,7 @@ verl checkpoint 是 `.pt` 格式，需要转换为 HuggingFace 格式才能用 e
 - 用户网络需要 clash 代理访问 GitHub/PyPI
 - verl checkpoint 不是 HuggingFace 格式，需要转换
 - 多轮交互需要安装 sglang（当前未安装）
+- 论文用 OPD，我们用 GRPO，KL coefficient 含义不同（OPD=1.0 vs GRPO=0.001）
 
 ## 恢复指令
 1. 生成数据: `bash examples/scienceworld_grpo/generate_all_data.sh`

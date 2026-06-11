@@ -29,14 +29,15 @@ MODEL_PATH=${MODEL_PATH:-/workspace/models/Qwen3-1.7B}
 NNODES=${NNODES:-1}
 NGPUS_PER_NODE=${NGPUS_PER_NODE:-1}
 
-# Training hyperparameters (aligned with TCOD paper)
+# Training hyperparameters (aligned with TCOD paper Table 4)
 TRAIN_BATCH_SIZE=${TRAIN_BATCH_SIZE:-64}
 MICRO_BATCH_SIZE=${MICRO_BATCH_SIZE:-8}
 MAX_PROMPT_LENGTH=${MAX_PROMPT_LENGTH:-10240}
 MAX_RESPONSE_LENGTH=${MAX_RESPONSE_LENGTH:-512}
 
-# Learning rate (same as TCOD paper)
+# Learning rate and optimization (same as TCOD paper)
 ACTOR_LR=${ACTOR_LR:-1e-6}
+GRAD_CLIP=${GRAD_CLIP:-1.0}
 KL_LOSS_COEF=${KL_LOSS_COEF:-0.001}
 ENTROPY_COEFF=${ENTROPY_COEFF:-0}
 
@@ -44,12 +45,14 @@ ENTROPY_COEFF=${ENTROPY_COEFF:-0}
 ROLLOUT_N=${ROLLOUT_N:-4}
 ROLLOUT_TP=${ROLLOUT_TP:-1}
 ROLLOUT_GPU_MEM_UTIL=${ROLLOUT_GPU_MEM_UTIL:-0.7}
+ROLLOUT_TEMPERATURE=${ROLLOUT_TEMPERATURE:-1.0}
 
 # Training schedule (250 steps as in TCOD paper)
 TOTAL_EPOCHS=${TOTAL_EPOCHS:-1}
 TOTAL_STEPS=${TOTAL_STEPS:-250}
-SAVE_FREQ=${SAVE_FREQ:-50}
+SAVE_FREQ=${SAVE_FREQ:-250}
 TEST_FREQ=${TEST_FREQ:-5}
+SEED=${SEED:-42}
 
 # Data configuration (all 30 tasks)
 DATA_DIR=${DATA_DIR:-/workspace/data/scienceworld_all}
@@ -133,6 +136,7 @@ python3 -m verl.trainer.main_ppo \
     data.max_response_length=${MAX_RESPONSE_LENGTH} \
     actor_rollout_ref.model.path=${MODEL_PATH} \
     actor_rollout_ref.actor.optim.lr=${ACTOR_LR} \
+    actor_rollout_ref.actor.optim.grad_clip=${GRAD_CLIP} \
     actor_rollout_ref.actor.ppo_mini_batch_size=${TRAIN_BATCH_SIZE} \
     actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=${MICRO_BATCH_SIZE} \
     actor_rollout_ref.actor.kl_loss_coef=${KL_LOSS_COEF} \
@@ -140,6 +144,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.tensor_model_parallel_size=${ROLLOUT_TP} \
     actor_rollout_ref.rollout.gpu_memory_utilization=${ROLLOUT_GPU_MEM_UTIL} \
     actor_rollout_ref.rollout.n=${ROLLOUT_N} \
+    actor_rollout_ref.rollout.temperature=${ROLLOUT_TEMPERATURE} \
     actor_rollout_ref.rollout.multi_turn.tool_config_path="${TMPCONF}/scienceworld_tool_config.yaml" \
     actor_rollout_ref.rollout.multi_turn.interaction_config_path="${TMPCONF}/scienceworld_interaction_config.yaml" \
     trainer.project_name=${PROJECT_NAME} \
@@ -149,6 +154,7 @@ python3 -m verl.trainer.main_ppo \
     trainer.save_freq=${SAVE_FREQ} \
     trainer.test_freq=${TEST_FREQ} \
     trainer.total_epochs=${TOTAL_EPOCHS} \
+    trainer.seed=${SEED} \
     "$@"
 
 # Cleanup temp config

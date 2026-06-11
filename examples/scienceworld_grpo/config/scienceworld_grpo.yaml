@@ -13,7 +13,7 @@ custom_reward_function:
 data:
   max_prompt_length: 10240
   max_response_length: 512
-  train_batch_size: 32
+  train_batch_size: 64
   return_raw_chat: True
   filter_overlong_prompts: True
   truncation: 'error'
@@ -26,7 +26,8 @@ actor_rollout_ref:
   actor:
     optim:
       lr: 1e-6
-    ppo_mini_batch_size: 32
+      grad_clip: 1.0
+    ppo_mini_batch_size: 64
     ppo_micro_batch_size_per_gpu: 8
     use_dynamic_bsz: True
     use_kl_loss: True
@@ -39,10 +40,11 @@ actor_rollout_ref:
   rollout:
     name: vllm
     tensor_model_parallel_size: 1
-    gpu_memory_utilization: 0.6
+    gpu_memory_utilization: 0.7
     n: 4
     log_prob_micro_batch_size_per_gpu: 8
     max_num_batched_tokens: 16384
+    temperature: 1.0
     multi_turn:
       enable: False
   ref:
@@ -59,7 +61,8 @@ trainer:
   logger: ['console']
   n_gpus_per_node: 1
   nnodes: 1
-  save_freq: 5
-  test_freq: 2
+  save_freq: 250
+  test_freq: 5
   total_epochs: 1
   val_before_train: False
+  seed: 42
