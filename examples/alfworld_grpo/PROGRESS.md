@@ -6,6 +6,35 @@
 
 ---
 
+## SGLang 多轮训练配置
+
+**问题**：vLLM 不支持真正的多轮交互
+
+**解决方案**：使用 SGLang 0.4.6.post5 进行多轮 rollout
+
+### 新增文件
+1. `config/alfworld_sglang_multiturn.yaml` - SGLang 多轮训练配置
+2. `run_sglang_multiturn.sh` - SGLang 多轮训练启动脚本
+
+### 关键配置差异
+| 配置项 | vLLM (单轮) | SGLang (多轮) |
+|--------|------------|---------------|
+| rollout.name | vllm | sglang |
+| multi_turn.enable | True | True |
+| max_assistant_turns | 30 | 30 |
+| 响应长度 | 501 tokens (截断) | 预期 50-150 tokens/轮 |
+
+### 使用方法
+```bash
+# SGLang 多轮训练
+bash examples/alfworld_grpo/run_sglang_multiturn.sh
+
+# vLLM 单轮训练（旧）
+bash examples/alfworld_grpo/run_mock.sh
+```
+
+---
+
 ## 参考文献配置（TCOD 论文）
 
 **论文**：TCOD: Exploring Temporal Curriculum in On-Policy Distillation for Multi-turn Autonomous Agents (Wang et al., 2026)
