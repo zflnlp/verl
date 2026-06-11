@@ -266,7 +266,10 @@ def _build_alfworld_config_simple(game_files_dir: str, task_type_ids: list) -> d
 
 
 def format_for_verl(tasks: list) -> pd.DataFrame:
-    """Format tasks for verl training."""
+    """Format tasks for verl training.
+
+    The prompt format MUST match AlfworldInteraction._format_observation() exactly.
+    """
     data = []
 
     for task in tasks:
@@ -274,44 +277,16 @@ def format_for_verl(tasks: list) -> pd.DataFrame:
         goal = task["goal"]
 
         # Build the initial prompt matching the interaction's _format_observation output
-        prompt = f"""You are a household robot agent performing tasks in a simulated home environment.
-Your task is: {goal}
-Task type: {task_type}
-
-Prior to this step, you have already taken 0 step(s).
-Below are the most recent 0 observations and the corresponding actions you took:
+        # Format: comma-separated actions in brackets (NOT bullet points)
+        prompt = f"""You are an expert agent operating in the ALFRED Embodied Environment. Your task is: {goal}
+Prior to this step, you have already taken 0 step(s). Below are the most recent 0 observations and the corresponding actions you took:
 (no history)
+You are now at step 1 and your current observation is: You are in the middle of a room. Looking quickly around you, you see a cabinet 6, a cabinet 5, a cabinet 4, a cabinet 3, a cabinet 2, a cabinet 1, a coffeemachine 1, a countertop 3, a countertop 2, a countertop 1, a diningtable 1, a drawer 3, a drawer 2, a drawer 1, a fridge 1, a garbagecan 1, a microwave 1, a shelf 3, a shelf 2, a shelf 1, a sinkbasin 1, a stoveburner 4, a stoveburner 3, a stoveburner 2, a stoveburner 1, and a toaster 1.
+Your admissible actions of the current situation are: [look, inventory, go to cabinet 1, go to countertop 1, go to fridge 1, go to sinkbasin 1, go to diningtable 1, go to stoveburner 1, go to microwave 1, go to garbagecan 1, take apple from countertop 1, take cup from cabinet 1, take knife from drawer 1, take mug from shelf 1, take plate from diningtable 1, take sponge from sinkbasin 1, examine cabinet 1, examine countertop 1, examine fridge 1].
 
-You are now at step 1 and your current observation is:
-You are in the middle of a room. Looking quickly around you, you see a cabinet 6, a cabinet 5,
-a cabinet 4, a cabinet 3, a cabinet 2, a cabinet 1, a coffeemachine 1, a countertop 3,
-a countertop 2, a countertop 1, a diningtable 1, a drawer 3, a drawer 2, a drawer 1,
-a fridge 1, a garbagecan 1, a microwave 1, a shelf 3, a shelf 2, a shelf 1,
-a sinkbasin 1, a stoveburner 4, a stoveburner 3, a stoveburner 2, a stoveburner 1,
-and a toaster 1.
-
-Your admissible actions of the current situation are:
-- look
-- inventory
-- go to cabinet 1
-- go to countertop 1
-- go to fridge 1
-- go to sinkbasin 1
-- go to diningtable 1
-- go to stoveburner 1
-- go to microwave 1
-- go to garbagecan 1
-- take apple from countertop 1
-- take cup from cabinet 1
-- take knife from drawer 1
-- take mug from shelf 1
-- take plate from diningtable 1
-- take sponge from sinkbasin 1
-- examine cabinet 1
-- examine countertop 1
-- examine fridge 1
-
-Now it's your turn to take one action for the current step. You should first reason step-by-step about the current situation, then think carefully which admissible action best advances the household task. This reasoning process MUST be enclosed within <thought> tags. Once you've finished your reasoning, you should choose an admissible action for current step and present it within <action> </action> tags."""
+Now it's your turn to take an action.
+You should first reason step-by-step about the current situation. This reasoning process MUST be enclosed within <thought> tags.
+Once you've finished your reasoning, you should choose an admissible action for current step and present it within <action> </action> tags."""
 
         messages = [
             {"role": "system", "content": "You are an expert agent operating in the ALFRED Embodied Environment."},

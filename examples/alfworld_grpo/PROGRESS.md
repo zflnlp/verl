@@ -1,8 +1,8 @@
 # ALFWorld GRPO 项目进度
 
-## 当前状态：全任务 Zero-shot 评估中（1.7B），Mock 训练等待 GPU 空闲
+## 当前状态：代码审查完成，Prompt 一致性修复，准备 Mock 训练
 
-最后更新：2026-06-10
+最后更新：2026-06-11
 
 ---
 
@@ -30,6 +30,7 @@
 3. **`dones` 类型是 tuple**：`isinstance(dones, list)` 为 False → `bool((False,)) = True` → 1 步结束。修复：`isinstance(dones, (list, tuple))`
 4. **tokenizer.json 损坏**（14B）：加了 fallback 到 slow tokenizer
 5. **setuptools 82.x 移除 pkg_resources**：裸环境需 `pip install "setuptools<70"`
+6. **Prompt 格式不一致**：`data_preprocess.py` 和 `alfworld_interaction.py` 的 prompt 格式不同（bullet points vs comma-separated brackets）。修复：统一为 comma-separated brackets 格式
 
 ### ✅ Prompt 更新（匹配文献）
 - System: `"You are an expert agent operating in the ALFRED Embodied Environment."`
@@ -94,6 +95,10 @@
 
 ## 进行中
 
+### ⏳ 全任务 Zero-shot 评估（1.7B）
+- 命令：见下方"待做"部分
+- 状态：进行中（`/workspace/data/alfworld_eval_1.7B_all/`）
+
 ### ⏳ Mock 训练
 - 命令：`bash examples/alfworld_grpo/run_mock.sh`
 - 状态：GPU 显存不足（公用机器），等空闲后重跑
@@ -103,7 +108,7 @@
 
 ## 待做
 
-### 🔲 全任务类型 Zero-shot 评估（1.7B）
+### 🔲 全任务类型 Zero-shot 评估（1.7B）- 进行中
 ```bash
 CUDA_VISIBLE_DEVICES=0 python examples/alfworld_grpo/eval_zero_shot.py \
     --model_path /workspace/models/Qwen3-1.7B/ \
@@ -112,6 +117,13 @@ CUDA_VISIBLE_DEVICES=0 python examples/alfworld_grpo/eval_zero_shot.py \
     --alfworld_data_dir /workspace/data/alf_data \
     --output_dir /workspace/data/alfworld_eval_1.7B_all
 ```
+
+### 🔲 Mock 训练
+```bash
+bash examples/alfworld_grpo/run_mock.sh
+```
+- 重新生成 mock 数据（使用修复后的 prompt 格式）
+- 运行 mock 训练
 
 ### 🔲 Mock 训练后全任务评估
 GRPO 训练完成后，用同样的 `--all_task_types` 评估，对比 baseline win rate 提升。
