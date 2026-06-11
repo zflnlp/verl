@@ -44,7 +44,7 @@ def extract_action(text: str) -> str:
 
 
 def format_prompt(task_description, step_count, history, observation, admissible_actions):
-    history_length = min(3, len(history))
+    history_length = min(2, len(history))
     history_lines = []
     for i, step in enumerate(history[-history_length:]):
         history_lines.append(f"Step {step_count - history_length + i + 1}: Action: {step.get('action', '')}")
@@ -111,7 +111,7 @@ def run_episode(env, model, tokenizer, max_steps):
         text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         inputs = tokenizer(text, return_tensors="pt").to(model.device)
         with __import__("torch").no_grad():
-            outputs = model.generate(**inputs, max_new_tokens=512, do_sample=False, temperature=1.0, top_p=1.0,
+            outputs = model.generate(**inputs, max_new_tokens=512, do_sample=True, temperature=0.4, top_p=1.0,
                                      pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id)
         response = tokenizer.decode(outputs[0][inputs["input_ids"].shape[-1]:], skip_special_tokens=True)
         action = extract_action(response)

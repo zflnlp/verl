@@ -1,8 +1,93 @@
 # ALFWorld GRPO 项目进度
 
-## 当前状态：代码审查完成，Prompt 一致性修复，准备 Mock 训练
+## 当前状态：配置已对齐 TCOD 论文，准备 Mock 训练
 
 最后更新：2026-06-11
+
+---
+
+## 参考文献配置（TCOD 论文）
+
+**论文**：TCOD: Exploring Temporal Curriculum in On-Policy Distillation for Multi-turn Autonomous Agents (Wang et al., 2026)
+
+### Prompt 格式（Section E.1）✅ 已匹配
+```
+You are an expert agent operating in the ALFRED Embodied Environment. Your task is to: {task description}
+Prior to this step, you have already taken {step count} step(s). Below are the most recent {history length} observations and the corresponding actions you took:
+{action history}
+You are now at step {current step} and your current observation is: {current observation}
+Your admissible actions of the current situation are: [{admissible actions}].
+Now it's your turn to take an action.
+You should first reason step-by-step about the current situation. This reasoning process MUST be enclosed within <thought> tags.
+Once you've finished your reasoning, you should choose an admissible action for current step and present it within <action> </action> tags.
+```
+
+### 数据划分（Section D.1）
+| 划分 | 说明 | 数量 |
+|------|------|------|
+| `valid_seen` | 训练见过的场景 | - |
+| `valid_unseen` | 新房间布局和物体组合（OOD 评估） | - |
+| `train_hard` | 教师在 pass@10 采样下失败的任务 | 121 个 |
+
+### 训练超参数（Table 4）
+| 参数 | 论文值 | 当前值 | 状态 |
+|------|--------|--------|------|
+| Algorithm | On-Policy Distillation | GRPO | 不同方法 |
+| KL coefficient | 1.0 | 1.0 | ✅ 已对齐 |
+| Learning rate | 1×10⁻⁶ | 1×10⁻⁶ | ✅ 一致 |
+| Gradient clipping | 1.0 | 1.0 | ✅ 已对齐 |
+| Total training steps | 250 | - | ⚠️ 待设置 |
+| Batch size | 16 | 32 | ⚠️ 待对齐 |
+| Train batch size | 64 | 32 | ⚠️ 待对齐 |
+| **Max prompt tokens** | **10,240** | **10,240** | ✅ **已对齐** |
+| **Max response tokens** | **512** | **512** | ✅ **已对齐** |
+| Temperature (training) | 1.0 | - | ⚠️ 待设置 |
+| Temperature (evaluation) | 0.4 | 0.4 | ✅ 已对齐 |
+| ALFWorld max steps | 30 | 30 | ✅ 一致 |
+| GPUs | 8× H20 (96GB) | 1× GPU | 不同规模 |
+| Tensor parallel size | 2 | 1 | 不同规模 |
+| GPU memory utilization | 0.7 | 0.7 | ✅ 已对齐 |
+| Data type | BFloat16 | BFloat16 | ✅ 一致 |
+
+### 评估超参数（Table 5）
+| 参数 | 论文值 | 当前值 | 状态 |
+|------|--------|--------|------|
+| Maximum tokens | 4,096 | 512 | ⚠️ 待对齐 |
+| Temperature | 0.4 | 0.4 | ✅ 已对齐 |
+| Top-p | 1.0 | 1.0 | ✅ 一致 |
+| Max environment steps | 30 | 30 | ✅ 一致 |
+| **History length** | **2 steps** | **2 steps** | ✅ **已对齐** |
+| Number of workers | 8 | 1 | 不同规模 |
+
+### ALFWorld 结果（Table 2）
+| 模型 | 方法 | Valid Seen | Valid Unseen | Hard |
+|------|------|------------|--------------|------|
+| Qwen2.5-7B | Teacher (GRPO) | 85.71% | 76.87% | 6.61% |
+| Qwen2.5-3B | Zero-Shot | 7.86% | 2.24% | 0.83% |
+| Qwen2.5-3B | SFT | 32.14% | 25.37% | 4.96% |
+| Qwen2.5-3B | Vanilla OPD | 65.72% | 60.45% | 10.74% |
+| Qwen2.5-3B | **TCOD B2F** | **77.86%** | **69.89%** | **13.22%** |
+| Qwen2.5-3B | TCOD F2B | 81.43% | 70.90% | 9.92% |
+| Qwen2.5-7B | Zero-Shot | 9.29% | 8.96% | 1.65% |
+| Qwen2.5-7B | SFT | 54.29% | 48.73% | 8.26% |
+| Qwen2.5-7B | Vanilla OPD | 75.37% | 72.14% | 13.22% |
+| Qwen2.5-7B | **TCOD B2F** | **86.43%** | **77.61%** | **20.66%** |
+
+### 跨模型结果（Table 3，Qwen3 系列）
+| 模型 | 方法 | ALFWorld | WebShop | ScienceWorld |
+|------|------|----------|---------|--------------|
+| Qwen3-30B | Teacher | 39.57% | 32.84% | 18.42% |
+| Qwen3-1.7B | Vanilla OPD | 0.32% | 0.14% | 0.05% |
+| Qwen3-1.7B | TCOD B2F (η=2) | 24.55% | 20.54% | 10.82% |
+| Qwen3-1.7B | TCOD F2B (η=6) | 23.65% | 21.78% | 11.08% |
+| Qwen3-4B | Vanilla OPD | 36.85% | 30.12% | 15.95% |
+| Qwen3-4B | TCOD B2F (η=6) | 39.35% | 29.05% | 15.88% |
+| Qwen3-4B | TCOD F2B (η=2) | 38.95% | 31.81% | 17.85% |
+
+### 对齐优先级
+1. **P0（必须）**：Max prompt tokens (10,240) ✅、Max response tokens (512) ✅、History length (2) ✅
+2. **P1（重要）**：评估温度 (0.4) ✅、KL coefficient (1.0) ✅、Gradient clipping (1.0) ✅
+3. **P2（可选）**：Batch size、Train batch size、GPU memory utilization ✅
 
 ---
 

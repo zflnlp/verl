@@ -336,8 +336,8 @@ class AlfworldInteraction(BaseInteraction):
         step_count = instance.get("num_steps", 0)
         steps = instance.get("steps", [])
 
-        # Build action history (last 3 steps)
-        history_length = min(3, len(steps))
+        # Build action history (last 2 steps)
+        history_length = min(2, len(steps))
         history_lines = []
         for i, step in enumerate(steps[-history_length:]):
             step_action = _extract_action(step.get("action", ""))
