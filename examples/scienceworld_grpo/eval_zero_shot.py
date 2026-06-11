@@ -6,8 +6,8 @@ Usage:
     python examples/scienceworld_grpo/eval_zero_shot.py \
         --model_path /workspace/models/Qwen3-1.7B \
         --task_name boil \
-        --num_variations 10 \
-        --max_steps 25 \
+        --num_variations 30 \
+        --max_steps 30 \
         --simplifications_preset easy
 
 Requirements:
@@ -160,7 +160,7 @@ def main():
     parser.add_argument("--model_path", type=str, required=True, help="Path to the model")
     parser.add_argument("--task_name", type=str, default="boil", help="ScienceWorld task name")
     parser.add_argument("--num_variations", type=int, default=10, help="Number of variations to test")
-    parser.add_argument("--max_steps", type=int, default=25, help="Max steps per episode")
+    parser.add_argument("--max_steps", type=int, default=30, help="Max steps per episode")
     parser.add_argument("--simplifications_preset", type=str, default="easy",
                         help="Simplification preset (easy/none)")
     parser.add_argument("--output_dir", type=str, default=None,

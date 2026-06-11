@@ -11,8 +11,8 @@ custom_reward_function:
   name: compute_score
 
 data:
-  max_prompt_length: 2048
-  max_response_length: 4096
+  max_prompt_length: 10240
+  max_response_length: 512
   train_batch_size: 32
   return_raw_chat: True
   filter_overlong_prompts: True
