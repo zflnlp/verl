@@ -4,13 +4,32 @@
 基于 verl 框架为 ScienceWorld benchmark 构建 GRPO 训练管线，训练 Qwen3-1.7B 模型完成科学实验任务。
 
 ## 当前状态
-**阶段**: 扩展训练数据已完成，准备运行完整训练（对齐 TCOD 论文）
+**阶段**: 多轮 GRPO 训练准备完成，等待运行
 
 ## 源码参考
 - ScienceWorld 源码: `benchmarks/ScienceWorld/`
 - WebShop 源码: `benchmarks/WebShop/`
 - alfworld 源码: `benchmarks/alfworld/`
 - 数据目录: `data/`
+
+---
+
+## 训练方式对比
+
+### 单轮 vs 多轮
+
+| | 单轮（已验证） | 多轮（推荐） |
+|--|---------------|-------------|
+| rollout 引擎 | vllm | sglang |
+| 交互方式 | 模型一次性输出所有动作 | 每步生成一个动作，接收观察，继续 |
+| max_turns | 1 | 30 |
+| 奖励 | 只看最终分数 | 每步都可以有中间奖励 |
+| 适用场景 | 简单任务 | ScienceWorld 等需要多步推理的任务 |
+
+**为什么需要多轮？**
+- ScienceWorld 是多轮交互任务，需要 30 步实验操作
+- 单轮：模型一次性输出所有动作，无法根据环境反馈调整策略
+- 多轮：模型每步看到新观察，动态调整策略，更接近真实实验过程
 
 ---
 
@@ -105,7 +124,7 @@
 ## 已完成工作
 
 ### 1. 环境搭建 ✅
-- verl 0.4.1 + vllm 0.8.5
+- verl 0.4.1 + vllm 0.8.5 + sglang 0.4.6.post5
 - 服务器: hgx18 (8x H100 80GB)
 - 模型: `/workspace/models/Qwen3-1.7B`（1.7B）和 `/workspace/models/Qwen3-14B`（14B）
 - ScienceWorld 包已安装
@@ -172,7 +191,7 @@ bash examples/scienceworld_grpo/generate_all_data.sh
 - 保存位置: `/workspace/data/scienceworld_all/`
 - 元数据: `task_metadata.json`
 
-### 5. GRPO 训练已跑通 ✅（小规模验证）
+### 6. 单轮 GRPO 训练已跑通 ✅（小规模验证）
 ```bash
 conda activate verl
 CUDA_VISIBLE_DEVICES=0 bash examples/scienceworld_grpo/run_real.sh \
@@ -189,25 +208,40 @@ CUDA_VISIBLE_DEVICES=0 bash examples/scienceworld_grpo/run_real.sh \
 **Checkpoint 位置**:
 `checkpoints/verl_grpo_scienceworld_real/scienceworld_real_grpo_20260610_0940/global_step_3/`
 
-### 6. 配置对齐 TCOD 论文 ✅
+### 7. 配置对齐 TCOD 论文 ✅
 已更新所有配置文件，参数与论文 Table 4/5 对齐。
+
+### 8. sglang 安装完成 ✅
+```bash
+pip install "sglang[all]==0.4.6.post5"
+# 验证
+python -c "import sglang; print(sglang.__version__)"  # 0.4.6.post5
+```
+
+### 9. 多轮训练配置创建 ✅
+新增文件：
+- `config/scienceworld_multiturn_grpo.yaml` — 多轮训练主配置
+- `config/tool_config/scienceworld_tool_config.yaml` — 工具配置
+- `config/interaction_config/scienceworld_interaction_config.yaml` — 交互配置
+- `run_multiturn_training.sh` — 多轮训练脚本
 
 ---
 
 ## 待完成工作
 
-### 7. 运行完整训练 ⏳
+### 10. 运行多轮训练 ⏳
 ```bash
 # 在服务器上运行
-conda activate verl
+cd /workspace/verl
 git pull
-CUDA_VISIBLE_DEVICES=1 bash examples/scienceworld_grpo/run_full_training.sh
+export SGL_DISABLE_TP_MEMORY_INBALANCE_CHECK=True
+CUDA_VISIBLE_DEVICES=1 bash examples/scienceworld_grpo/run_multiturn_training.sh
 ```
 
-### 8. Checkpoint 格式转换
+### 11. Checkpoint 格式转换
 verl checkpoint 是 `.pt` 格式，需要转换为 HuggingFace 格式才能用 eval 脚本测试
 
-### 9. 训练后评估
+### 12. 训练后评估
 - 用训练后的模型在 test set 上评估
 - 报告 Average Score (0-100) 和 Success Rate (%)
 - 对比 baseline（1.7B: 0.0, 14B: 1.0）
@@ -215,46 +249,80 @@ verl checkpoint 是 `.pt` 格式，需要转换为 HuggingFace 格式才能用 e
 ---
 
 ## 关键文件
-- `eval_zero_shot.py` — 零样本评估脚本
-- `data_preprocess.py` — 数据预处理脚本（支持所有 30 个任务）
-- `reward_function.py` — 奖励函数（直接调用 ScienceWorld 环境）
-- `run_mock.sh` — Mock 训练脚本
-- `run_real.sh` — 真实训练脚本
-- `run_full_training.sh` — 完整训练脚本（对齐 TCOD 论文）
-- `generate_all_data.sh` — 数据生成脚本（所有 30 个任务）
-- `config/scienceworld_grpo.yaml` — 主训练配置
-- `verl/interactions/scienceworld_interaction.py` — 核心交互类
-- `verl/tools/scienceworld_tool.py` — action 工具
-- `benchmarks/ScienceWorld/` — ScienceWorld 源码
+
+### 训练脚本
+| 文件 | 说明 |
+|------|------|
+| `run_mock.sh` | Mock 训练脚本（测试 pipeline） |
+| `run_real.sh` | 单轮真实训练脚本（vllm） |
+| `run_full_training.sh` | 单轮完整训练脚本（对齐 TCOD） |
+| `run_multiturn_training.sh` | **多轮训练脚本（sglang）** ⭐ |
+
+### 配置文件
+| 文件 | 说明 |
+|------|------|
+| `config/scienceworld_grpo.yaml` | 单轮训练配置 |
+| `config/scienceworld_multiturn_grpo.yaml` | **多轮训练配置** ⭐ |
+| `config/tool_config/scienceworld_tool_config.yaml` | 工具配置 |
+| `config/interaction_config/scienceworld_interaction_config.yaml` | 交互配置 |
+
+### 数据和评估
+| 文件 | 说明 |
+|------|------|
+| `data_preprocess.py` | 数据预处理（支持 30 个任务） |
+| `generate_all_data.sh` | 数据生成脚本 |
+| `eval_zero_shot.py` | 零样本评估脚本 |
+| `reward_function.py` | 奖励函数 |
+
+### 核心代码
+| 文件 | 说明 |
+|------|------|
+| `verl/interactions/scienceworld_interaction.py` | 多轮交互类 |
+| `verl/tools/scienceworld_tool.py` | Action 工具 |
+| `benchmarks/ScienceWorld/` | ScienceWorld 源码 |
+
+---
 
 ## 奖励函数设计
-**当前方案**: reward function 直接调用 ScienceWorld 环境
-1. 从模型输出提取 `<action>` 标签
-2. 在 ScienceWorld 环境中执行动作
-3. 返回真实环境分数（0-100 归一化到 0-1）
 
-**Fallback**: 如果没有 `<action>` 标签，返回 0 分
+### 单轮模式
+**方案**: reward function 直接调用 ScienceWorld 环境
+1. 从模型输出提取 `<action>` 标签
+2. 在 ScienceWorld 环境中执行所有动作
+3. 返回最终分数（0-100 归一化到 0-1）
+
+### 多轮模式
+**方案**: 每步交互都可以有奖励
+1. 模型生成一个动作
+2. 环境执行并返回观察
+3. 可以给中间奖励（如完成子任务）
+4. 最终给任务完成分数
+
+---
 
 ## 技术决策
 | 决策 | 原因 |
 |------|------|
-| sync 模式 + reward function 直接调环境 | vllm async 模式不兼容，verl 需要 sglang |
-| 单轮生成 + reward function 执行 | 比多轮交互更简单、可靠 |
+| 多轮交互 + sglang | ScienceWorld 需要 30 步交互，vllm 不支持多轮 |
+| GRPO 而非 OPD | verl 框架原生支持 GRPO |
 | 使用 Qwen3-1.7B | 用户指定，显存友好 |
 | 全部 30 个任务 | 对齐 TCOD 论文 |
 | ScienceWorld 内置划分 | 官方标准，论文可直接引用 |
-| GRPO 而非 OPD | verl 框架原生支持 GRPO |
+
+---
 
 ## 注意事项
 - ScienceWorld Java 服务器有时会变僵尸进程，需要 `kill -9` 清理
 - 命令行参数: `--num_variations` 不是 `--num_variation`
 - 用户网络需要 clash 代理访问 GitHub/PyPI
 - verl checkpoint 不是 HuggingFace 格式，需要转换
-- 多轮交互需要安装 sglang（当前未安装）
+- sglang 需要设置 `SGL_DISABLE_TP_MEMORY_INBALANCE_CHECK=True`
 - 论文用 OPD，我们用 GRPO，KL coefficient 含义不同（OPD=1.0 vs GRPO=0.001）
+
+---
 
 ## 恢复指令
 1. 生成数据: `bash examples/scienceworld_grpo/generate_all_data.sh`
-2. 运行训练: `bash examples/scienceworld_grpo/run_full_training.sh`
+2. 运行多轮训练: `bash examples/scienceworld_grpo/run_multiturn_training.sh`
 3. 评估模型: `python examples/scienceworld_grpo/eval_zero_shot.py --model_path <checkpoint_path> --task_name boil --num_variations 30 --max_steps 30`
 4. 查看 ScienceWorld 源码: `ls benchmarks/ScienceWorld/`
