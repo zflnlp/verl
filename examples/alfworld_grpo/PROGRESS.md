@@ -97,24 +97,41 @@ Once you've finished your reasoning, you should choose an admissible action for 
 | `train_hard` | 教师在 pass@10 采样下失败的任务 | 121 个 |
 
 ### 训练超参数（Table 4）
-| 参数 | 论文值 | 当前值 | 状态 |
-|------|--------|--------|------|
-| Algorithm | On-Policy Distillation | GRPO | 不同方法 |
-| KL coefficient | 1.0 | 1.0 | ✅ 已对齐 |
-| Learning rate | 1×10⁻⁶ | 1×10⁻⁶ | ✅ 一致 |
-| Gradient clipping | 1.0 | 1.0 | ✅ 已对齐 |
-| Total training steps | 250 | - | ⚠️ 待设置 |
-| Batch size | 16 | 32 | ⚠️ 待对齐 |
-| Train batch size | 64 | 32 | ⚠️ 待对齐 |
-| **Max prompt tokens** | **10,240** | **10,240** | ✅ **已对齐** |
-| **Max response tokens** | **512** | **512** | ✅ **已对齐** |
-| Temperature (training) | 1.0 | - | ⚠️ 待设置 |
-| Temperature (evaluation) | 0.4 | 0.4 | ✅ 已对齐 |
-| ALFWorld max steps | 30 | 30 | ✅ 一致 |
-| GPUs | 8× H20 (96GB) | 1× GPU | 不同规模 |
-| Tensor parallel size | 2 | 1 | 不同规模 |
-| GPU memory utilization | 0.7 | 0.7 | ✅ 已对齐 |
-| Data type | BFloat16 | BFloat16 | ✅ 一致 |
+| 参数 | 论文值 | 当前值 | 状态 | 说明 |
+|------|--------|--------|------|------|
+| Algorithm | On-Policy Distillation | GRPO | ⚠️ 不同方法 | 论文用 OPD，我们用 GRPO |
+| KL coefficient | 1.0 | 1.0 | ✅ 已对齐 | |
+| Learning rate | 1×10⁻⁶ | 1×10⁻⁶ | ✅ 一致 | |
+| Gradient clipping | 1.0 | 1.0 | ✅ 已对齐 | |
+| Total training steps | 250 | - | ⚠️ 待设置 | |
+| Batch size | 16 | 32 | ⚠️ 待对齐 | |
+| Train batch size | 64 | 32 | ⚠️ 待对齐 | |
+| **Max prompt tokens** | **10,240** | **10,240** | ✅ **已对齐** | |
+| **Max response tokens** | **512** | **6,144** | ⚠️ **不同** | 见下方说明 |
+| Temperature (training) | 1.0 | - | ⚠️ 待设置 | |
+| Temperature (evaluation) | 0.4 | 0.4 | ✅ 已对齐 | |
+| ALFWorld max steps | 30 | 30 | ✅ 一致 | |
+| GPUs | 8× H20 (96GB) | 2× GPU | 不同规模 | |
+| Tensor parallel size | 2 | 2 | ✅ 已对齐 | |
+| GPU memory utilization | 0.7 | 0.7 | ✅ 已对齐 | |
+| Data type | BFloat16 | BFloat16 | ✅ 一致 | |
+
+### 为什么 Max Response Tokens 不同？
+
+**论文（OPD）**：
+- 每个响应是**单轮**的（thought + action）
+- 响应长度：50-150 tokens
+- 512 tokens 足够
+
+**我们（GRPO Multi-Turn）**：
+- "response" 包含**整个对话历史**（30 轮 × ~200 tokens）
+- 需要 6,144 tokens 容纳完整交互
+
+**验证结果**：
+| max_response_length | response_length/mean | clip_ratio | 效果 |
+|---------------------|---------------------|------------|------|
+| 512 | 512.000 | 1.000 | ❌ 全部截断 |
+| 6,144 | 1513.461 | 0.000 | ✅ 多轮生效 |
 
 ### 评估超参数（Table 5）
 | 参数 | 论文值 | 当前值 | 状态 |
