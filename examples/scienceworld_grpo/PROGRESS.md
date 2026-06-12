@@ -4,7 +4,14 @@
 基于 verl 框架为 ScienceWorld benchmark 构建 GRPO 训练管线，训练 Qwen3-1.7B 模型完成科学实验任务。
 
 ## 当前状态
-**阶段**: 多轮 GRPO 训练准备完成，等待运行
+**阶段**: 多轮 GRPO 训练运行中（sglang + 30 步交互）
+
+### 最新进展
+- ✅ sglang 安装完成（0.4.6.post5）
+- ✅ 数据格式修复（添加 interaction_kwargs 字段）
+- ✅ 多轮训练配置创建完成
+- ✅ 多轮训练正在运行中
+- ⏳ 观察训练效果，等待收敛
 
 ## 源码参考
 - ScienceWorld 源码: `benchmarks/ScienceWorld/`
@@ -225,26 +232,64 @@ python -c "import sglang; print(sglang.__version__)"  # 0.4.6.post5
 - `config/interaction_config/scienceworld_interaction_config.yaml` — 交互配置
 - `run_multiturn_training.sh` — 多轮训练脚本
 
----
+### 10. 数据格式修复 ✅
+添加 `interaction_kwargs` 字段，多轮训练必需：
+```python
+"extra_info": {
+    "task_name": "boil",
+    "variation": 14,
+    "interaction_kwargs": {
+        "ground_truth": task,  # 传递给 start_interaction()
+    }
+}
+```
 
-## 待完成工作
-
-### 10. 运行多轮训练 ⏳
+### 11. 多轮训练运行中 ⏳
 ```bash
 # 在服务器上运行
 cd /workspace/verl
 git pull
-export SGL_DISABLE_TP_MEMORY_INBALANCE_CHECK=True
+# 重新生成数据（包含 interaction_kwargs）
+bash examples/scienceworld_grpo/generate_all_data.sh
+# 运行多轮训练
 CUDA_VISIBLE_DEVICES=1 bash examples/scienceworld_grpo/run_multiturn_training.sh
 ```
 
-### 11. Checkpoint 格式转换
+**训练观察（早期阶段）**：
+- ✅ 多轮交互正常工作（30 步交互）
+- ✅ 模型正确使用 `<think>` 和 `<action>` 标签
+- ✅ 环境反馈正常（返回观察和错误信息）
+- ⚠️ 模型存在"死循环"现象（反复尝试同一失败动作）
+- ⚠️ 这是早期 RL 训练的正常现象，需要更多训练步骤
+
+**预期进展**：
+```
+早期: 重复尝试 → 失败 → 重复尝试
+中期: 尝试不同动作 → 部分成功
+后期: 根据反馈调整策略 → 高成功率
+```
+
+---
+
+## 待完成工作
+
+### 12. 等待多轮训练收敛
+- 观察奖励是否上升（从 0 → 0.1 → 0.5 → ...）
+- 观察动作是否更准确（从随机尝试 → 有策略地完成任务）
+- 观察完成率是否提高（从 0% → 10% → 30% → ...）
+
+### 13. Checkpoint 格式转换
 verl checkpoint 是 `.pt` 格式，需要转换为 HuggingFace 格式才能用 eval 脚本测试
 
-### 12. 训练后评估
+### 14. 训练后评估
 - 用训练后的模型在 test set 上评估
 - 报告 Average Score (0-100) 和 Success Rate (%)
 - 对比 baseline（1.7B: 0.0, 14B: 1.0）
+
+### 15. 优化方向（如果训练效果不好）
+1. **增加探索**：提高 temperature（当前 1.0，可试 1.2）
+2. **添加过程奖励**：给中间步骤小奖励（如"尝试新动作 +0.01"）
+3. **优化 prompt**：在 system message 中提醒"如果动作失败，尝试其他有效动作"
 
 ---
 
