@@ -23,6 +23,8 @@
 | multi_turn.enable | True | True |
 | max_assistant_turns | 30 | 30 |
 | max_response_length | 512 | 6144 |
+| tensor_model_parallel_size | 1 | 2 |
+| NGPUS_PER_NODE | 1 | 2 |
 | 响应长度 | 501 tokens (截断) | 预期多轮对话历史 |
 
 ### 使用方法
