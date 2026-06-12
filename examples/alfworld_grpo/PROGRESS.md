@@ -183,6 +183,7 @@ Once you've finished your reasoning, you should choose an admissible action for 
 4. **tokenizer.json 损坏**（14B）：加了 fallback 到 slow tokenizer
 5. **setuptools 82.x 移除 pkg_resources**：裸环境需 `pip install "setuptools<70"`
 6. **Prompt 格式不一致**：`data_preprocess.py` 和 `alfworld_interaction.py` 的 prompt 格式不同（bullet points vs comma-separated brackets）。修复：统一为 comma-separated brackets 格式
+7. **游戏文件搜索模式错误**：目录名是 `task_type-Obj-None-Loc-ID` 格式，需要使用通配符 `task_type-*` 匹配
 
 ### ✅ Prompt 更新（匹配文献）
 - System: `"You are an expert agent operating in the ALFRED Embodied Environment."`

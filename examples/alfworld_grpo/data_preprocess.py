@@ -166,12 +166,13 @@ def generate_real_dataset(task_type: str, num_games: int, seed: int, game_files_
     internal_name = TASK_TYPE_MAP[task_type]["internal_name"]
 
     # Discover game files from ALFWorld data directory
-    # Structure: $ALFWORLD_DATA/json_2.1.1/{train|valid_seen|valid_unseen}/{internal_name}/.../game.tw-pddl
+    # Structure: $ALFWORLD_DATA/json_2.1.1/{train|valid_seen|valid_unseen}/{internal_name}-*/trial_T*/game.tw-pddl
     game_files = []
     if game_files_dir:
         import glob
         for split in ["train", "valid_seen", "valid_unseen"]:
-            pattern = os.path.join(game_files_dir, "json_2.1.1", split, internal_name, "**", "game.tw-pddl")
+            # Use wildcard to match directory names like "pick_and_place_simple-Knife-None-SideTable-3"
+            pattern = os.path.join(game_files_dir, "json_2.1.1", split, f"{internal_name}-*", "**", "game.tw-pddl")
             found = sorted(glob.glob(pattern, recursive=True))
             game_files.extend(found)
         # Deduplicate
