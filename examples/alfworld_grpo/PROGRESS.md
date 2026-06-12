@@ -29,8 +29,11 @@
 
 ### 使用方法
 ```bash
-# SGLang 多轮训练
+# SGLang 多轮训练 (Mock)
 bash examples/alfworld_grpo/run_sglang_multiturn.sh
+
+# SGLang 多轮训练 (Real)
+bash examples/alfworld_grpo/run_sglang_real.sh
 
 # vLLM 单轮训练（旧）
 bash examples/alfworld_grpo/run_mock.sh
@@ -280,6 +283,47 @@ GRPO 训练完成后，用同样的 `--all_task_types` 评估，对比 baseline 
 ### 🔲 Real 训练
 1. 生成真实数据（需要 alfworld 环境）
 2. 跑真实训练（需要 alfworld + verl 统一环境）
+
+---
+
+## 真实数据训练
+
+### 数据生成
+
+```bash
+# 生成真实数据（需要 ALFWorld 环境）
+python examples/alfworld_grpo/data_preprocess.py \
+    --local_save_dir /workspace/data/alfworld_real \
+    --use_real_env \
+    --num_games 100 \
+    --game_files_dir /workspace/data/alf_data
+```
+
+### 训练步骤
+
+```bash
+# 1. 生成真实数据
+python examples/alfworld_grpo/data_preprocess.py \
+    --local_save_dir /workspace/data/alfworld_real \
+    --use_real_env \
+    --num_games 100 \
+    --game_files_dir /workspace/data/alf_data
+
+# 2. 运行真实训练（SGLang 多轮）
+CUDA_VISIBLE_DEVICES=2,7 bash examples/alfworld_grpo/run_sglang_real.sh
+```
+
+### 论文配置对齐
+
+| 配置项 | 论文值 | 我们的值 | 状态 |
+|--------|--------|----------|------|
+| 数据划分 | train/valid_seen/valid_unseen | train/valid_seen/valid_unseen | ✅ 一致 |
+| 任务类型 | 6 种 | 6 种 | ✅ 一致 |
+| Max steps | 30 | 30 | ✅ 一致 |
+| Max prompt tokens | 10,240 | 10,240 | ✅ 已对齐 |
+| Max response tokens | 512 | 6,144 | ✅ 已对齐（多轮） |
+| KL coefficient | 1.0 | 1.0 | ✅ 已对齐 |
+| Learning rate | 1e-6 | 1e-6 | ✅ 一致 |
 
 ---
 
