@@ -12,7 +12,7 @@ custom_reward_function:
 
 data:
   max_prompt_length: 10240
-  max_response_length: 512
+  max_response_length: 6144
   train_batch_size: 64
   return_raw_chat: True
   filter_overlong_prompts: True
