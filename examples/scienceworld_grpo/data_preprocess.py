@@ -177,6 +177,9 @@ Once you've finished your reasoning, you should choose a valid action for the cu
             "extra_info": {
                 "task_name": task["task_name"],
                 "variation": task.get("variation", 0),
+                "interaction_kwargs": {
+                    "ground_truth": task,
+                },
             },
         })
 
