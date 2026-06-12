@@ -292,12 +292,15 @@ GRPO 训练完成后，用同样的 `--all_task_types` 评估，对比 baseline 
 ### 数据生成
 
 ```bash
-# 生成真实数据（需要 ALFWorld 环境）
+# 生成单任务数据（pick_and_place）
 python examples/alfworld_grpo/data_preprocess.py \
     --local_save_dir /workspace/data/alfworld_real \
     --use_real_env \
     --num_games 100 \
     --game_files_dir /workspace/data/alf_data
+
+# 生成全部 6 种任务类型数据（推荐）
+bash examples/alfworld_grpo/generate_all_tasks.sh
 ```
 
 ### 训练步骤
