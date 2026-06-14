@@ -20,7 +20,7 @@ MODEL_PATH=${MODEL_PATH:-/workspace/models/Qwen3-1.7B}
 
 # Hardware configuration
 NNODES=${NNODES:-1}
-NGPUS_PER_NODE=${NGPUS_PER_NODE:-1}
+NGPUS_PER_NODE=${NGPUS_PER_NODE:-4}
 
 # Training hyperparameters (aligned with TCOD paper)
 TRAIN_BATCH_SIZE=${TRAIN_BATCH_SIZE:-64}
