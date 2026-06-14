@@ -18,7 +18,7 @@ MODEL_PATH=${MODEL_PATH:-/workspace/models/Qwen3-1.7B}
 
 # Hardware configuration
 NNODES=${NNODES:-1}
-NGPUS_PER_NODE=${NGPUS_PER_NODE:-2}
+NGPUS_PER_NODE=${NGPUS_PER_NODE:-4}
 
 # Training hyperparameters
 TRAIN_BATCH_SIZE=${TRAIN_BATCH_SIZE:-32}
@@ -33,7 +33,7 @@ ENTROPY_COEFF=${ENTROPY_COEFF:-0}
 
 # Rollout configuration
 ROLLOUT_N=${ROLLOUT_N:-4}
-ROLLOUT_TP=${ROLLOUT_TP:-2}
+ROLLOUT_TP=${ROLLOUT_TP:-4}
 ROLLOUT_GPU_MEM_UTIL=${ROLLOUT_GPU_MEM_UTIL:-0.7}
 
 # Training schedule

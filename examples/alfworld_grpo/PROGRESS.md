@@ -111,8 +111,8 @@ Once you've finished your reasoning, you should choose an admissible action for 
 | Temperature (training) | 1.0 | - | ⚠️ 待设置 | |
 | Temperature (evaluation) | 0.4 | 0.4 | ✅ 已对齐 | |
 | ALFWorld max steps | 30 | 30 | ✅ 一致 | |
-| GPUs | 8× H20 (96GB) | 2× GPU | 不同规模 | |
-| Tensor parallel size | 2 | 2 | ✅ 已对齐 | |
+| GPUs | 8× H20 (96GB) | 4× GPU | 不同规模 | |
+| Tensor parallel size | 2 | 4 | ✅ 已对齐 | |
 | GPU memory utilization | 0.7 | 0.7 | ✅ 已对齐 | |
 | Data type | BFloat16 | BFloat16 | ✅ 一致 | |
 
