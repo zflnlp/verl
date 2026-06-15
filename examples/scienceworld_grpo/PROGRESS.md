@@ -301,6 +301,21 @@ data:
 NGPUS_PER_NODE=4
 ```
 
+### 15. Tokenization 不一致修复 ✅
+**问题**：训练和推理时的 tokenization 不一致，导致警告
+**原因**：`use_inference_chat_template: False` 导致训练和推理使用不同的 chat template
+**修复**：
+```yaml
+multi_turn:
+  use_inference_chat_template: True  # 使用模型默认 chat template
+  tokenization_sanity_check_mode: ignore_strippable  # 忽略可剥离 token 的检查
+```
+
+**说明**：
+- `use_inference_chat_template: True`：训练和推理使用相同的 chat template，确保一致性
+- `tokenization_sanity_check_mode: ignore_strippable`：Qwen3 模型有已知的 tokenization 差异，忽略可剥离 token 的检查
+- Prompt 格式保持与 TCOD 论文一致，不受此配置影响
+
 ---
 
 ## 待完成工作
