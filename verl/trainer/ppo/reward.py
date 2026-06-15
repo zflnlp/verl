@@ -109,6 +109,44 @@ def load_reward_manager(config, tokenizer, num_examine, **reward_kwargs):
     )
 
 
+def convert_multiturn_rewards_to_rm_scores(data: DataProto) -> DataProto:
+    """
+    Convert multi-turn rewards from non_tensor_batch["reward_scores"] to batch["rm_scores"].
+
+    In multi-turn mode (sglang), the interaction class returns rewards that are stored in
+    non_tensor_batch["reward_scores"]. This function converts them to batch["rm_scores"]
+    so the reward manager can use them.
+
+    The reward_scores structure is an array of dicts, where each dict has:
+    - "user_turn_rewards": list of floats from the interaction class
+
+    For ScienceWorld, we take the last reward (final reward after all turns).
+    """
+    if "reward_scores" not in data.non_tensor_batch:
+        return data
+
+    reward_scores = data.non_tensor_batch["reward_scores"]
+    batch_size = len(reward_scores)
+
+    # Create rm_scores tensor
+    response_length = data.batch["responses"].shape[1]
+    rm_scores = torch.zeros(batch_size, response_length, dtype=torch.float32)
+
+    for i, scores in enumerate(reward_scores):
+        if isinstance(scores, dict) and "user_turn_rewards" in scores:
+            user_turn_rewards = scores["user_turn_rewards"]
+            if user_turn_rewards:
+                # Take the last reward (final reward after all turns)
+                final_reward = user_turn_rewards[-1]
+                # Set the reward at the last position of the response
+                rm_scores[i, response_length - 1] = final_reward
+
+    # Add rm_scores to batch
+    data.batch["rm_scores"] = rm_scores
+
+    return data
+
+
 def compute_reward(data: DataProto, reward_fn):
     """
     Compute reward for a batch of data.
@@ -118,6 +156,9 @@ def compute_reward(data: DataProto, reward_fn):
     Returns:
         Tuple of reward tensor and extra info dictionary.
     """
+    # Convert multi-turn rewards to rm_scores if available
+    data = convert_multiturn_rewards_to_rm_scores(data)
+
     try:
         reward_result = reward_fn(data, return_dict=True)
         reward_tensor = reward_result["reward_tensor"]
