@@ -85,6 +85,8 @@ class ScienceWorldInteraction(BaseInteraction):
             "steps": [],
             "current_observation": "",
             "reward": 0.0,
+            "cumulative_reward": 0.0,  # 过程奖励累积
+            "last_score": 0.0,  # 上一步的分数
             "is_done": False,
             "num_steps": 0,
             "task_name": gt.get("task_name", "unknown"),
@@ -163,11 +165,13 @@ class ScienceWorldInteraction(BaseInteraction):
 
         if should_terminate:
             instance["is_done"] = True
+            # 使用累积过程奖励作为最终奖励
             final_reward = await self.calculate_score(instance_id)
             instance["reward"] = final_reward
             return True, observation, final_reward, {"num_steps": instance["num_steps"]}
         else:
-            return False, observation, 0.0, {"num_steps": instance["num_steps"]}
+            # 返回当前步的过程奖励（不是 0.0）
+            return False, observation, reward, {"num_steps": instance["num_steps"]}
 
     def _process_real_action(self, action: str, instance: dict) -> Tuple[str, float, bool]:
         """Process an action using the real ScienceWorld environment.
@@ -177,7 +181,8 @@ class ScienceWorldInteraction(BaseInteraction):
             instance: The interaction instance state.
 
         Returns:
-            Tuple of (observation, reward, is_done).
+            Tuple of (observation, step_reward, is_done).
+            step_reward is the delta score (process reward) for this step.
         """
         env = instance.get("env")
         if env is None:
@@ -187,13 +192,24 @@ class ScienceWorldInteraction(BaseInteraction):
 
         try:
             obs, score, is_done, info = env.step(clean_action)
-            # ScienceWorld score is 0-100, normalize to 0-1
+            # ScienceWorld returns:
+            # - score: 0-100 (total task completion percentage)
+            # - reward: delta score (change from last step)
             raw_score = info.get("score", score)
+            step_reward = info.get("reward", 0)  # 过程奖励（分数变化）
+
+            # Update instance state
             instance["last_score"] = raw_score
-            reward = score / 100.0 if score > 1.0 else score
+            instance["cumulative_reward"] += step_reward
+
+            # Normalize step reward to [0, 1] range
+            # ScienceWorld reward can be negative (if score decreases)
+            # We clamp to [0, 1] for valid range
+            normalized_step_reward = max(0.0, min(1.0, step_reward / 100.0))
+
             # Update possible actions for next turn
             instance["possible_actions"] = env.get_possible_actions()
-            return obs, reward, is_done
+            return obs, normalized_step_reward, is_done
         except Exception as e:
             logger.error(f"ScienceWorld step error: {e}")
             return f"Error executing action: {e}", 0.0, False
@@ -244,6 +260,8 @@ Now it's your turn to take an action. You should first reason step-by-step about
     async def calculate_score(self, instance_id: str, **kwargs) -> float:
         """Calculate the reward score for the interaction.
 
+        Uses cumulative process rewards (dense rewards) instead of just final score.
+
         Args:
             instance_id: The interaction instance ID.
 
@@ -255,10 +273,14 @@ Now it's your turn to take an action. You should first reason step-by-step about
 
         instance = self._instance_dict[instance_id]
 
-        # Use environment reward if available
+        # Use cumulative process reward if available
         if not self.use_mock and instance.get("env") is not None:
-            score = instance.get("last_score", 0.0)
-            return score / 100.0 if score > 1.0 else score
+            # 使用累积过程奖励
+            cumulative_reward = instance.get("cumulative_reward", 0.0)
+            # 归一化到 [0, 1] 范围
+            # ScienceWorld 的总分是 100，所以除以 100
+            normalized_reward = max(0.0, min(1.0, cumulative_reward / 100.0))
+            return normalized_reward
 
         # Use accumulated reward
         if instance["reward"] > 0:
