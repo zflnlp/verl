@@ -17,6 +17,7 @@ import os
 from functools import partial
 
 import ray
+import torch
 
 from verl import DataProto
 from verl.utils.reward_score import default_compute_score
