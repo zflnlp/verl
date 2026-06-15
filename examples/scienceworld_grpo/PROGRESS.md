@@ -338,6 +338,30 @@ def compute_score(...):
 - 当前：reward function 返回 0.0，interaction 奖励未使用
 - 目标：将 `non_tensor_batch["reward_scores"]` 传递给 `batch["rm_scores"]`
 
+### 17. 多轮奖励传递修复 ✅
+**问题**：interaction 的奖励存在 `non_tensor_batch["reward_scores"]`，但 reward manager 检查 `batch["rm_scores"]`
+**修复**：在 `reward.py` 中添加 `convert_multiturn_rewards_to_rm_scores()` 函数
+
+### 18. 过程奖励（Dense Rewards）✅
+**问题**：只使用最终分数，学习信号稀疏
+**修复**：使用 ScienceWorld 的过程奖励（delta score）
+
+**ScienceWorld 奖励机制**：
+```python
+score = int(round(100 * self.server.getScore()))  # 0-100 分
+reward = score - self.lastStepScore                # 过程奖励（分数变化）
+```
+
+**修改内容**：
+1. `_process_real_action`: 返回每步的 delta score（过程奖励）
+2. `generate_response`: 每步都返回奖励（不是 0.0）
+3. `calculate_score`: 使用累积过程奖励
+
+**效果**：
+- ✅ 学习信号更密集（每步都有奖励）
+- ✅ 训练更快收敛
+- ✅ 与 ScienceWorld 环境对齐
+
 ---
 
 ## 待完成工作
