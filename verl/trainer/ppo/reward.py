@@ -122,6 +122,7 @@ def convert_multiturn_rewards_to_rm_scores(data: DataProto) -> DataProto:
     - "user_turn_rewards": list of floats from the interaction class
 
     For ScienceWorld, we take the last reward (final reward after all turns).
+    Rewards are clamped to [0, 1] to ensure valid range.
     """
     if "reward_scores" not in data.non_tensor_batch:
         return data
@@ -139,6 +140,8 @@ def convert_multiturn_rewards_to_rm_scores(data: DataProto) -> DataProto:
             if user_turn_rewards:
                 # Take the last reward (final reward after all turns)
                 final_reward = user_turn_rewards[-1]
+                # Clamp to [0, 1] to ensure valid range
+                final_reward = max(0.0, min(1.0, float(final_reward)))
                 # Set the reward at the last position of the response
                 rm_scores[i, response_length - 1] = final_reward
 
