@@ -251,14 +251,16 @@ cd /workspace/verl
 git pull
 # 重新生成数据（包含 interaction_kwargs）
 bash examples/scienceworld_grpo/generate_all_data.sh
-# 运行多轮训练
-CUDA_VISIBLE_DEVICES=1 bash examples/scienceworld_grpo/run_multiturn_training.sh
+# 运行多轮训练（4 GPU）
+CUDA_VISIBLE_DEVICES=2,3,4,5 bash examples/scienceworld_grpo/run_multiturn_training.sh
 ```
 
 **训练观察（早期阶段）**：
 - ✅ 多轮交互正常工作（30 步交互）
 - ✅ 模型正确使用 `<think>` 和 `<action>` 标签
 - ✅ 环境反馈正常（返回观察和错误信息）
+- ✅ 有样本得满分 1.0（任务完成）
+- ✅ 模型在学习任务推理（理解任务目标、规划多步操作）
 - ⚠️ 模型存在"死循环"现象（反复尝试同一失败动作）
 - ⚠️ 这是早期 RL 训练的正常现象，需要更多训练步骤
 
@@ -269,24 +271,54 @@ CUDA_VISIBLE_DEVICES=1 bash examples/scienceworld_grpo/run_multiturn_training.sh
 后期: 根据反馈调整策略 → 高成功率
 ```
 
+### 12. 配置修复 ✅
+**问题**：多轮训练出现 -100 分数
+**原因**：配置文件中同时有 `custom_reward_function` 和 `ScienceWorldInteraction`，两者冲突
+**修复**：移除 `custom_reward_function`，多轮模式下奖励由 `ScienceWorldInteraction` 类处理
+
+```yaml
+# 移除此配置
+# custom_reward_function:
+#   path: examples/scienceworld_grpo/reward_function.py
+#   name: compute_score
+```
+
+### 13. 响应长度优化 ✅
+**问题**：96.9% 响应被截断（512 token 不够）
+**修复**：增加 `max_response_length` 到 6144
+
+```yaml
+data:
+  max_response_length: 6144  # 从 512 增加到 6144
+```
+
+### 14. GPU 配置优化 ✅
+**问题**：默认只用 1 张 GPU
+**修复**：设置 `NGPUS_PER_NODE=4`
+
+```bash
+# 默认使用 4 张 GPU
+NGPUS_PER_NODE=4
+```
+
 ---
 
 ## 待完成工作
 
-### 12. 等待多轮训练收敛
+### 15. 等待多轮训练收敛
 - 观察奖励是否上升（从 0 → 0.1 → 0.5 → ...）
 - 观察动作是否更准确（从随机尝试 → 有策略地完成任务）
 - 观察完成率是否提高（从 0% → 10% → 30% → ...）
 
-### 13. Checkpoint 格式转换
+### 16. Checkpoint 格式转换
 verl checkpoint 是 `.pt` 格式，需要转换为 HuggingFace 格式才能用 eval 脚本测试
 
-### 14. 训练后评估
+### 17. 训练后评估
 - 用训练后的模型在 test set 上评估
 - 报告 Average Score (0-100) 和 Success Rate (%)
 - 对比 baseline（1.7B: 0.0, 14B: 1.0）
 
-### 15. 优化方向（如果训练效果不好）
+### 18. 优化方向（如果训练效果不好）
 1. **增加探索**：提高 temperature（当前 1.0，可试 1.2）
 2. **添加过程奖励**：给中间步骤小奖励（如"尝试新动作 +0.01"）
 3. **优化 prompt**：在 system message 中提醒"如果动作失败，尝试其他有效动作"
