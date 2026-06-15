@@ -47,6 +47,8 @@ actor_rollout_ref:
       max_assistant_turns: 30
       tool_config_path: examples/scienceworld_grpo/config/tool_config/scienceworld_tool_config.yaml
       interaction_config_path: examples/scienceworld_grpo/config/interaction_config/scienceworld_interaction_config.yaml
+      use_inference_chat_template: True
+      tokenization_sanity_check_mode: ignore_strippable
   ref:
     log_prob_micro_batch_size_per_gpu: 8
     fsdp_config:
