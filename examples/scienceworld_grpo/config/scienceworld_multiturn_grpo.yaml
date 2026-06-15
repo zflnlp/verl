@@ -7,7 +7,10 @@ defaults:
   - _self_
 
 # NOTE: In multi-turn mode, rewards are handled by ScienceWorldInteraction class
-# Do NOT use custom_reward_function here - it conflicts with interaction-based rewards
+# We still need a custom_reward_function for the default reward manager
+custom_reward_function:
+  path: examples/scienceworld_grpo/reward_function.py
+  name: compute_score
 
 data:
   max_prompt_length: 10240
