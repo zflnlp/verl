@@ -316,6 +316,28 @@ multi_turn:
 - `tokenization_sanity_check_mode: ignore_strippable`：Qwen3 模型有已知的 tokenization 差异，忽略可剥离 token 的检查
 - Prompt 格式保持与 TCOD 论文一致，不受此配置影响
 
+### 16. 奖励函数修复 ✅
+**问题**：多轮训练出现 -100 分数
+**原因**：
+1. `reward_function.py` 在多轮模式下重复运行 ScienceWorld 环境
+2. 系统需要 `custom_reward_function` 处理 `data_source='scienceworld'`
+3. Interaction 的奖励存在 `non_tensor_batch["reward_scores"]`，但 reward manager 检查 `batch["rm_scores"]`
+
+**修复**：
+```python
+# reward_function.py
+def compute_score(...):
+    # 检查是否是多轮模式
+    if extra_info and extra_info.get("interaction_kwargs"):
+        return 0.0  # 多轮模式：奖励由 interaction 处理
+    # 单轮模式：运行环境
+    ...
+```
+
+**待解决**：多轮模式下，interaction 的奖励需要正确传递给 reward manager
+- 当前：reward function 返回 0.0，interaction 奖励未使用
+- 目标：将 `non_tensor_batch["reward_scores"]` 传递给 `batch["rm_scores"]`
+
 ---
 
 ## 待完成工作
