@@ -14,9 +14,8 @@
 """
 Reward function for ScienceWorld GRPO training.
 
-This reward function directly interacts with the ScienceWorld environment
-to get real environment scores. It extracts actions from the model's
-response and executes them in the environment.
+For multi-turn mode: returns 0.0 (rewards handled by ScienceWorldInteraction)
+For single-turn mode: extracts actions and runs in ScienceWorld environment
 """
 
 import re
@@ -29,38 +28,6 @@ def _extract_actions(text: str) -> list:
     return [a.strip() for a in actions if a.strip()]
 
 
-def _run_scienceworld_episode(task_name: str, variation: int, actions: list) -> float:
-    """Run actions in ScienceWorld and return the final score.
-
-    Args:
-        task_name: ScienceWorld task name (e.g. "boil")
-        variation: Variation index
-        actions: List of action strings to execute
-
-    Returns:
-        Final score normalized to 0-1 (ScienceWorld returns 0-100)
-    """
-    try:
-        from scienceworld import ScienceWorldEnv
-
-        env = ScienceWorldEnv()
-        env.load(task_name, variation)
-
-        final_score = 0.0
-        for action in actions:
-            obs, score, is_done, info = env.step(action)
-            final_score = info.get("score", score)
-            if is_done:
-                break
-
-        # Normalize: ScienceWorld score is 0-100
-        return final_score / 100.0 if final_score > 1.0 else final_score
-
-    except Exception as e:
-        print(f"[reward_fn] ScienceWorld error: {e}")
-        return 0.0
-
-
 def compute_score(
     data_source: str,
     solution_str: str,
@@ -70,10 +37,14 @@ def compute_score(
 ) -> float:
     """Compute reward for ScienceWorld task completion.
 
-    This function:
-    1. Extracts actions from the model's <action> tags
-    2. Runs them in the real ScienceWorld environment
-    3. Returns the environment score (0-1)
+    In multi-turn mode (with ScienceWorldInteraction):
+        - Returns 0.0 because rewards are handled by the interaction class
+        - The interaction class already runs the environment and returns scores
+
+    In single-turn mode (without interaction):
+        - Extracts actions from <action> tags
+        - Runs them in the ScienceWorld environment
+        - Returns the environment score (0-1)
 
     Args:
         data_source: Data source identifier (e.g. "scienceworld")
@@ -91,6 +62,13 @@ def compute_score(
         except Exception:
             ground_truth = {}
 
+    # Check if this is multi-turn mode (interaction_kwargs present)
+    if extra_info and extra_info.get("interaction_kwargs"):
+        # Multi-turn mode: rewards are handled by ScienceWorldInteraction
+        # Return 0.0 here, the interaction class will provide the real rewards
+        return 0.0
+
+    # Single-turn mode: extract actions and run in environment
     task_name = ground_truth.get("task_name", "boil")
     variation = ground_truth.get("variation", 0)
 
@@ -111,6 +89,22 @@ def compute_score(
         return 0.0
 
     # Run in ScienceWorld environment
-    env_reward = _run_scienceworld_episode(task_name, variation, actions)
+    try:
+        from scienceworld import ScienceWorldEnv
 
-    return env_reward
+        env = ScienceWorldEnv()
+        env.load(task_name, variation)
+
+        final_score = 0.0
+        for action in actions:
+            obs, score, is_done, info = env.step(action)
+            final_score = info.get("score", score)
+            if is_done:
+                break
+
+        # Normalize: ScienceWorld score is 0-100
+        return final_score / 100.0 if final_score > 1.0 else final_score
+
+    except Exception as e:
+        print(f"[reward_fn] ScienceWorld error: {e}")
+        return 0.0
