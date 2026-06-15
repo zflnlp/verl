@@ -6,9 +6,8 @@ defaults:
   - ppo_trainer
   - _self_
 
-custom_reward_function:
-  path: examples/scienceworld_grpo/reward_function.py
-  name: compute_score
+# NOTE: In multi-turn mode, rewards are handled by ScienceWorldInteraction class
+# Do NOT use custom_reward_function here - it conflicts with interaction-based rewards
 
 data:
   max_prompt_length: 10240
