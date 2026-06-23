@@ -202,6 +202,9 @@ class ScienceWorldInteraction(BaseInteraction):
             instance["last_score"] = raw_score
             instance["cumulative_reward"] += step_reward
 
+            # Debug logging
+            logger.info(f"[ScienceWorld] action={clean_action}, score={raw_score}, step_reward={step_reward}, cumulative={instance['cumulative_reward']}")
+
             # Normalize step reward to [0, 1] range
             # ScienceWorld reward can be negative (if score decreases)
             # We clamp to [0, 1] for valid range
@@ -280,6 +283,10 @@ Now it's your turn to take an action. You should first reason step-by-step about
             # 归一化到 [0, 1] 范围
             # ScienceWorld 的总分是 100，所以除以 100
             normalized_reward = max(0.0, min(1.0, cumulative_reward / 100.0))
+
+            # Debug logging
+            logger.info(f"[ScienceWorld] calculate_score: cumulative_reward={cumulative_reward}, normalized={normalized_reward}")
+
             return normalized_reward
 
         # Use accumulated reward
