@@ -170,8 +170,10 @@ class ScienceWorldInteraction(BaseInteraction):
             instance["reward"] = final_reward
             return True, observation, final_reward, {"num_steps": instance["num_steps"]}
         else:
-            # 返回当前步的过程奖励（不是 0.0）
-            return False, observation, reward, {"num_steps": instance["num_steps"]}
+            # 返回累积过程奖励（不是 delta score）
+            cumulative_reward = instance.get("cumulative_reward", 0.0)
+            normalized_cumulative = max(0.0, min(1.0, cumulative_reward / 100.0))
+            return False, observation, normalized_cumulative, {"num_steps": instance["num_steps"]}
 
     def _process_real_action(self, action: str, instance: dict) -> Tuple[str, float, bool]:
         """Process an action using the real ScienceWorld environment.
