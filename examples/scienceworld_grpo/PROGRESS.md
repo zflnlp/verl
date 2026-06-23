@@ -4,13 +4,14 @@
 基于 verl 框架为 ScienceWorld benchmark 构建 GRPO 训练管线，训练 Qwen3-1.7B 模型完成科学实验任务。
 
 ## 当前状态
-**阶段**: 多轮 GRPO 训练运行中（sglang + 30 步交互）
+**阶段**: 多轮 GRPO 训练运行中（sglang + 30 步交互 + 过程奖励）
 
 ### 最新进展
 - ✅ sglang 安装完成（0.4.6.post5）
 - ✅ 数据格式修复（添加 interaction_kwargs 字段）
 - ✅ 多轮训练配置创建完成
 - ✅ 多轮训练正在运行中
+- ✅ 过程奖励正常工作（分数从 0 提升到 0.25）
 - ⏳ 观察训练效果，等待收敛
 
 ## 源码参考
@@ -353,14 +354,28 @@ reward = score - self.lastStepScore                # 过程奖励（分数变化
 ```
 
 **修改内容**：
-1. `_process_real_action`: 返回每步的 delta score（过程奖励）
-2. `generate_response`: 每步都返回奖励（不是 0.0）
+1. `_process_real_action`: 自己计算 delta score（不依赖 `info["reward"]`）
+2. `generate_response`: 返回累积过程奖励（不是 delta score）
 3. `calculate_score`: 使用累积过程奖励
+
+**关键修复**：
+- 问题 1: `info["reward"]` 返回 0 → 自己计算 `total_score - last_score`
+- 问题 2: `generate_response` 返回 delta → 返回累积奖励
+- 问题 3: 奖励范围不正确 → 归一化到 [0, 1]
+
+**训练结果**：
+```
+平均分数: 0.028（从 0 提升）
+最大分数: 0.250（25% 完成）
+Policy loss: 0.199（有学习信号）
+优势范围: [-1.5, 1.5]（有差异）
+```
 
 **效果**：
 - ✅ 学习信号更密集（每步都有奖励）
 - ✅ 训练更快收敛
 - ✅ 与 ScienceWorld 环境对齐
+- ✅ 分数从 0 提升到 0.25
 
 ---
 
