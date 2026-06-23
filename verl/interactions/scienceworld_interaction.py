@@ -263,7 +263,8 @@ Now it's your turn to take an action. You should first reason step-by-step about
     async def calculate_score(self, instance_id: str, **kwargs) -> float:
         """Calculate the reward score for the interaction.
 
-        Uses cumulative process rewards (dense rewards) instead of just final score.
+        Uses final score (simple reward) instead of cumulative process rewards.
+        This is more reliable and easier to debug.
 
         Args:
             instance_id: The interaction instance ID.
@@ -276,16 +277,13 @@ Now it's your turn to take an action. You should first reason step-by-step about
 
         instance = self._instance_dict[instance_id]
 
-        # Use cumulative process reward if available
+        # Use final score (simple reward)
         if not self.use_mock and instance.get("env") is not None:
-            # 使用累积过程奖励
-            cumulative_reward = instance.get("cumulative_reward", 0.0)
-            # 归一化到 [0, 1] 范围
-            # ScienceWorld 的总分是 100，所以除以 100
-            normalized_reward = max(0.0, min(1.0, cumulative_reward / 100.0))
+            score = instance.get("last_score", 0.0)
+            normalized_reward = score / 100.0 if score > 1.0 else score
 
             # Debug logging
-            logger.info(f"[ScienceWorld] calculate_score: cumulative_reward={cumulative_reward}, normalized={normalized_reward}")
+            logger.info(f"[ScienceWorld] calculate_score: last_score={score}, normalized={normalized_reward}")
 
             return normalized_reward
 
