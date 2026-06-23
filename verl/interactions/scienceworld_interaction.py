@@ -193,17 +193,24 @@ class ScienceWorldInteraction(BaseInteraction):
         try:
             obs, score, is_done, info = env.step(clean_action)
             # ScienceWorld returns:
-            # - score: 0-100 (total task completion percentage)
-            # - reward: delta score (change from last step)
-            raw_score = info.get("score", score)
-            step_reward = info.get("reward", 0)  # 过程奖励（分数变化）
+            # - observation: string
+            # - score: delta score (reward for this step)
+            # - is_done: bool
+            # - info: dict with 'score' (total score) and other info
+
+            # Get total score from info
+            total_score = info.get("score", 0)
+
+            # Calculate delta score ourselves (don't rely on info["reward"])
+            last_score = instance.get("last_score", 0)
+            step_reward = total_score - last_score  # Delta score
 
             # Update instance state
-            instance["last_score"] = raw_score
+            instance["last_score"] = total_score
             instance["cumulative_reward"] += step_reward
 
             # Debug logging
-            logger.info(f"[ScienceWorld] action={clean_action}, score={raw_score}, step_reward={step_reward}, cumulative={instance['cumulative_reward']}")
+            logger.info(f"[ScienceWorld] action={clean_action}, total_score={total_score}, last_score={last_score}, step_reward={step_reward}, cumulative={instance['cumulative_reward']}")
 
             # Normalize step reward to [0, 1] range
             # ScienceWorld reward can be negative (if score decreases)
