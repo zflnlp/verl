@@ -210,7 +210,7 @@ def main():
                         default="benchmarks/ScienceWorld/goldpaths",
                         help="Directory containing goldpaths-all.zip")
     parser.add_argument("--output_dir", type=str,
-                        default="llama-factory/data/scienceworld_sft",
+                        default="/workspace/data/scienceworld_sft",
                         help="Output directory for SFT data")
     parser.add_argument("--system_prompt", type=str, default=None,
                         help="Custom system prompt")

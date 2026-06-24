@@ -31,7 +31,7 @@ LEARNING_RATE=${LEARNING_RATE:-2e-5}
 MAX_SEQ_LENGTH=${MAX_SEQ_LENGTH:-4096}
 
 # Data configuration
-DATA_DIR=${DATA_DIR:-llama-factory/data/scienceworld_sft}
+DATA_DIR=${DATA_DIR:-/workspace/data/scienceworld_sft}
 ########################### end user-adjustable ###########################
 
 # Get project directory
