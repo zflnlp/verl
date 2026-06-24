@@ -130,9 +130,9 @@ EOF
 echo ""
 echo "Training config created at: $LLAMA_FACTORY_DIR/examples/train_full/scienceworld_sft.yaml"
 echo ""
-echo "To start SFT training:"
-echo "  cd $LLAMA_FACTORY_DIR"
-echo "  llamafactory-cli train examples/train_full/scienceworld_sft.yaml"
-echo ""
-echo "Or run directly:"
-echo "  cd $LLAMA_FACTORY_DIR && llamafactory-cli train examples/train_full/scienceworld_sft.yaml"
+echo "Starting SFT training..."
+echo "=========================================="
+
+# Run SFT training
+cd "$LLAMA_FACTORY_DIR"
+llamafactory-cli train examples/train_full/scienceworld_sft.yaml
