@@ -57,16 +57,11 @@ if [ ! -d "$LLAMA_FACTORY_DIR" ]; then
     exit 1
 fi
 
-# Check if SFT data exists, if not, generate it
+# Check if SFT data exists
 if [ ! -f "$DATA_DIR/train.json" ]; then
-    echo "SFT data not found at $DATA_DIR/train.json"
-    echo "Generating SFT data from ScienceWorld gold trajectories..."
-    python examples/scienceworld_grpo/prepare_sft_data.py --output_dir "$DATA_DIR"
-fi
-
-# Verify data exists
-if [ ! -f "$DATA_DIR/train.json" ]; then
-    echo "Error: Failed to generate SFT data"
+    echo "Error: SFT data not found at $DATA_DIR/train.json"
+    echo "Please run data preparation first:"
+    echo "  python examples/scienceworld_grpo/prepare_sft_data.py --output_dir $DATA_DIR"
     exit 1
 fi
 
@@ -81,10 +76,6 @@ cp "$DATA_DIR/dataset_info.json" "$LLAMA_FACTORY_DIR/data/"
 echo "Creating symlinks for SFT data..."
 ln -sf "$DATA_DIR/train.json" "$LLAMA_FACTORY_DIR/data/scienceworld_train.json"
 ln -sf "$DATA_DIR/dev.json" "$LLAMA_FACTORY_DIR/data/scienceworld_dev.json" 2>/dev/null || true
-
-# Verify symlinks
-echo "Verifying symlinks..."
-ls -la "$LLAMA_FACTORY_DIR/data/scienceworld_*.json" 2>/dev/null || echo "Warning: Symlinks not created"
 
 # Create training config (full fine-tuning)
 cat > "$LLAMA_FACTORY_DIR/examples/train_full/scienceworld_sft.yaml" << EOF
