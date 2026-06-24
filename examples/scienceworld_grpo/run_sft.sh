@@ -117,7 +117,7 @@ learning_rate: ${LEARNING_RATE}
 num_train_epochs: ${EPOCHS}
 lr_scheduler_type: cosine
 warmup_ratio: 0.1
-bf16: true
+fp16: true
 ddp_timeout: 180000000
 
 ### eval
