@@ -134,5 +134,9 @@ echo "Starting SFT training..."
 echo "=========================================="
 
 # Run SFT training
+# Use single GPU by default, or specified GPUs
+CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
+export CUDA_VISIBLE_DEVICES
+
 cd "$LLAMA_FACTORY_DIR"
 llamafactory-cli train examples/train_full/scienceworld_sft.yaml
