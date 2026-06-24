@@ -57,34 +57,34 @@ if [ ! -d "$LLAMA_FACTORY_DIR" ]; then
     exit 1
 fi
 
-# Check if SFT data exists
+# Check if SFT data exists, if not, generate it
 if [ ! -f "$DATA_DIR/train.json" ]; then
-    echo "Error: SFT data not found at $DATA_DIR/train.json"
-    echo "Please run data preparation first:"
-    echo "  python examples/scienceworld_grpo/prepare_sft_data.py"
+    echo "SFT data not found at $DATA_DIR/train.json"
+    echo "Generating SFT data from ScienceWorld gold trajectories..."
+    python examples/scienceworld_grpo/prepare_sft_data.py --output_dir "$DATA_DIR"
+fi
+
+# Verify data exists
+if [ ! -f "$DATA_DIR/train.json" ]; then
+    echo "Error: Failed to generate SFT data"
     exit 1
 fi
 
 # Create output directory
 mkdir -p "$OUTPUT_DIR"
 
-# Create dataset_info.json in llama-factory/data if not exists
-if [ ! -f "$LLAMA_FACTORY_DIR/data/dataset_info.json" ]; then
-    echo "Warning: dataset_info.json not found in llama-factory/data/"
-    echo "Copying from SFT data directory..."
-    cp "$DATA_DIR/dataset_info.json" "$LLAMA_FACTORY_DIR/data/"
-fi
-
-# Copy dataset_info.json to llama-factory/data if not exists
-if [ ! -f "$LLAMA_FACTORY_DIR/data/dataset_info.json" ]; then
-    echo "Copying dataset_info.json to llama-factory/data..."
-    cp "$DATA_DIR/dataset_info.json" "$LLAMA_FACTORY_DIR/data/"
-fi
+# Copy dataset_info.json to llama-factory/data
+echo "Copying dataset_info.json to llama-factory/data..."
+cp "$DATA_DIR/dataset_info.json" "$LLAMA_FACTORY_DIR/data/"
 
 # Create symlinks for SFT data (no copy needed)
 echo "Creating symlinks for SFT data..."
 ln -sf "$DATA_DIR/train.json" "$LLAMA_FACTORY_DIR/data/scienceworld_train.json"
 ln -sf "$DATA_DIR/dev.json" "$LLAMA_FACTORY_DIR/data/scienceworld_dev.json" 2>/dev/null || true
+
+# Verify symlinks
+echo "Verifying symlinks..."
+ls -la "$LLAMA_FACTORY_DIR/data/scienceworld_*.json" 2>/dev/null || echo "Warning: Symlinks not created"
 
 # Create training config (full fine-tuning)
 cat > "$LLAMA_FACTORY_DIR/examples/train_full/scienceworld_sft.yaml" << EOF
