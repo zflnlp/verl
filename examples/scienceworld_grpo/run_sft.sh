@@ -57,10 +57,6 @@ if [ ! -d "$LLAMA_FACTORY_DIR" ]; then
     exit 1
 fi
 
-# Install compatible dependencies
-echo "Installing compatible dependencies..."
-pip install trl==0.11.0 tyro==0.8.5 2>/dev/null || true
-
 # Check if SFT data exists
 if [ ! -f "$DATA_DIR/train.json" ]; then
     echo "Error: SFT data not found at $DATA_DIR/train.json"
