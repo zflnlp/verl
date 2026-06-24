@@ -68,14 +68,7 @@ fi
 # Create output directory
 mkdir -p "$OUTPUT_DIR"
 
-# Copy dataset_info.json to llama-factory/data
-echo "Copying dataset_info.json to llama-factory/data..."
-cp "$DATA_DIR/dataset_info.json" "$LLAMA_FACTORY_DIR/data/"
-
-# Create symlinks for SFT data (no copy needed)
-echo "Creating symlinks for SFT data..."
-ln -sf "$DATA_DIR/train.json" "$LLAMA_FACTORY_DIR/data/scienceworld_train.json"
-ln -sf "$DATA_DIR/dev.json" "$LLAMA_FACTORY_DIR/data/scienceworld_dev.json" 2>/dev/null || true
+# No need to copy or symlink - use dataset_dir in config
 
 # Create training config (full fine-tuning)
 cat > "$LLAMA_FACTORY_DIR/examples/train_full/scienceworld_sft.yaml" << EOF
@@ -88,6 +81,7 @@ do_train: true
 finetuning_type: full
 
 ### dataset
+dataset_dir: ${DATA_DIR}
 dataset: scienceworld_train
 template: qwen3
 cutoff_len: ${MAX_SEQ_LENGTH}
