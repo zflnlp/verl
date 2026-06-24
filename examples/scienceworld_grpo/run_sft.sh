@@ -75,10 +75,16 @@ if [ ! -f "$LLAMA_FACTORY_DIR/data/dataset_info.json" ]; then
     cp "$DATA_DIR/dataset_info.json" "$LLAMA_FACTORY_DIR/data/"
 fi
 
-# Copy SFT data to llama-factory/data
-echo "Copying SFT data to llama-factory/data..."
-cp "$DATA_DIR/train.json" "$LLAMA_FACTORY_DIR/data/scienceworld_train.json"
-cp "$DATA_DIR/dev.json" "$LLAMA_FACTORY_DIR/data/scienceworld_dev.json" 2>/dev/null || true
+# Copy dataset_info.json to llama-factory/data if not exists
+if [ ! -f "$LLAMA_FACTORY_DIR/data/dataset_info.json" ]; then
+    echo "Copying dataset_info.json to llama-factory/data..."
+    cp "$DATA_DIR/dataset_info.json" "$LLAMA_FACTORY_DIR/data/"
+fi
+
+# Create symlinks for SFT data (no copy needed)
+echo "Creating symlinks for SFT data..."
+ln -sf "$DATA_DIR/train.json" "$LLAMA_FACTORY_DIR/data/scienceworld_train.json"
+ln -sf "$DATA_DIR/dev.json" "$LLAMA_FACTORY_DIR/data/scienceworld_dev.json" 2>/dev/null || true
 
 # Create training config (full fine-tuning)
 cat > "$LLAMA_FACTORY_DIR/examples/train_full/scienceworld_sft.yaml" << EOF
