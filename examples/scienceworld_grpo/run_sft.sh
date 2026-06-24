@@ -80,18 +80,15 @@ echo "Copying SFT data to llama-factory/data..."
 cp "$DATA_DIR/train.json" "$LLAMA_FACTORY_DIR/data/scienceworld_train.json"
 cp "$DATA_DIR/dev.json" "$LLAMA_FACTORY_DIR/data/scienceworld_dev.json" 2>/dev/null || true
 
-# Create training config
-cat > "$LLAMA_FACTORY_DIR/examples/train_lora/scienceworld_sft.yaml" << EOF
+# Create training config (full fine-tuning)
+cat > "$LLAMA_FACTORY_DIR/examples/train_full/scienceworld_sft.yaml" << EOF
 ### model
 model_name_or_path: ${MODEL_PATH}
 
 ### method
 stage: sft
 do_train: true
-finetuning_type: lora
-lora_rank: 64
-lora_alpha: 128
-lora_target: all
+finetuning_type: full
 
 ### dataset
 dataset: scienceworld_train
@@ -125,11 +122,11 @@ eval_steps: 500
 EOF
 
 echo ""
-echo "Training config created at: $LLAMA_FACTORY_DIR/examples/train_lora/scienceworld_sft.yaml"
+echo "Training config created at: $LLAMA_FACTORY_DIR/examples/train_full/scienceworld_sft.yaml"
 echo ""
 echo "To start SFT training:"
 echo "  cd $LLAMA_FACTORY_DIR"
-echo "  llamafactory-cli train examples/train_lora/scienceworld_sft.yaml"
+echo "  llamafactory-cli train examples/train_full/scienceworld_sft.yaml"
 echo ""
 echo "Or run directly:"
-echo "  cd $LLAMA_FACTORY_DIR && llamafactory-cli train examples/train_lora/scienceworld_sft.yaml"
+echo "  cd $LLAMA_FACTORY_DIR && llamafactory-cli train examples/train_full/scienceworld_sft.yaml"
