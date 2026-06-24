@@ -54,7 +54,11 @@ def extract_goldpaths(goldpaths_dir: str) -> dict:
 
 
 def convert_to_llama_factory(data: dict, system_prompt: str = None) -> list:
-    """Convert gold trajectories to llama-factory format."""
+    """Convert gold trajectories to llama-factory format.
+
+    IMPORTANT: The prompt format must match the RL training format exactly
+    (from scienceworld_interaction.py) for consistency.
+    """
     if system_prompt is None:
         system_prompt = (
             "You are a science experiment agent. You must always respond with exactly one "
@@ -87,15 +91,16 @@ def convert_to_llama_factory(data: dict, system_prompt: str = None) -> list:
             }
 
             # Add initial user message (task description)
+            # IMPORTANT: This format must match scienceworld_interaction.py exactly
             initial_observation = path[0]['observation'] if path else 'You are in a well-equipped science laboratory.'
             initial_prompt = f"""Your ScienceWorld task is: {task_description}
-Prior to this step, you have already taken 0 step(s). Below are the most recent 0 observations and the corresponding actions you took: (no history)
-You are now at step 1 and your current observation is: {initial_observation}
+Prior to this step, you have already taken 0 step(s).
+Below are the most recent 0 observations and the corresponding actions you took:
+(no history)
+You are now at step 1 and your current observation is:
+{initial_observation}
 Your valid actions of the current situation are: [look around, examine <object>, open <object>, close <object>, take <object> from <location>, put <object> in/on <location>, use <object> [on <object>], toggle <object>, pour <object> into <object>, mix <object>, go to <location>, look at <object>, wait, task].
-
-Now it's your turn to take an action.
-You should first reason step-by-step about the current situation. This reasoning process MUST be enclosed within <thought> tags.
-Once you've finished your reasoning, you should choose a valid action for the current step and present it within <action> </action> tags."""
+Now it's your turn to take an action. You should first reason step-by-step about the current situation. This reasoning process MUST be enclosed within <thought> tags. Once you've finished your reasoning, you should choose a valid action for the current step and present it within <action> </action> tags."""
 
             conv["conversations"].append({"from": "human", "value": initial_prompt})
 
@@ -109,15 +114,28 @@ Once you've finished your reasoning, you should choose a valid action for the cu
                 conv["conversations"].append({"from": "gpt", "value": assistant_response})
 
                 # If this is not the last step, add user message with observation
+                # IMPORTANT: This format must match scienceworld_interaction.py exactly
                 if i < len(path) - 1:
-                    next_observation = path[i + 1].get('observation', '')
+                    # Build action history (last 3 steps)
+                    history_length = min(3, i + 1)
+                    history_lines = []
+                    for j in range(max(0, i - history_length + 1), i + 1):
+                        history_step = path[j]
+                        history_action = history_step.get('action', '')
+                        history_obs = history_step.get('observation', '')
+                        history_lines.append(f"Step {j + 1}: Action: {history_action}")
+                        history_lines.append(f"Observation: {history_obs[:300]}")
 
-                    user_message = f"""Observation: {observation}
+                    action_history = "\n".join(history_lines) if history_lines else "(no history)"
+
+                    user_message = f"""Your ScienceWorld task is: {task_description}
+Prior to this step, you have already taken {i + 1} step(s).
+Below are the most recent {history_length} observations and the corresponding actions you took:
+{action_history}
+You are now at step {i + 2} and your current observation is:
+{observation}
 Your valid actions of the current situation are: [look around, examine <object>, open <object>, close <object>, take <object> from <location>, put <object> in/on <location>, use <object> [on <object>], toggle <object>, pour <object> into <object>, mix <object>, go to <location>, look at <object>, wait, task].
-
-Now it's your turn to take an action.
-You should first reason step-by-step about the current situation. This reasoning process MUST be enclosed within <thought> tags.
-Once you've finished your reasoning, you should choose a valid action for the current step and present it within <action> </action> tags."""
+Now it's your turn to take an action. You should first reason step-by-step about the current situation. This reasoning process MUST be enclosed within <thought> tags. Once you've finished your reasoning, you should choose a valid action for the current step and present it within <action> </action> tags."""
 
                     conv["conversations"].append({"from": "human", "value": user_message})
 
