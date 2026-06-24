@@ -57,6 +57,10 @@ if [ ! -d "$LLAMA_FACTORY_DIR" ]; then
     exit 1
 fi
 
+# Install compatible dependencies
+echo "Installing compatible dependencies..."
+pip install trl==0.11.0 tyro==0.8.5 2>/dev/null || true
+
 # Check if SFT data exists
 if [ ! -f "$DATA_DIR/train.json" ]; then
     echo "Error: SFT data not found at $DATA_DIR/train.json"
@@ -140,3 +144,6 @@ export CUDA_VISIBLE_DEVICES
 
 cd "$LLAMA_FACTORY_DIR"
 llamafactory-cli train examples/train_full/scienceworld_sft.yaml
+
+# Note: llama-factory is pinned to v0.9.2 for compatibility with CUDA 12.4
+# To update: cd llama-factory && git checkout v0.9.2
