@@ -84,7 +84,8 @@ eval_steps: 500
     print(f"Starting distributed training...")
 
     # Run llamafactory-cli train
-    cmd = ["llamafactory-cli", "train", config_path]
+    # Use sys.executable to ensure we use the same Python environment
+    cmd = [sys.executable, "-m", "llamafactory.cli", "train", config_path]
     subprocess.run(cmd, check=True)
 
 
