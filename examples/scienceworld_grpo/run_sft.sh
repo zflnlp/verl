@@ -70,7 +70,7 @@ mkdir -p "$OUTPUT_DIR"
 
 # No need to copy or symlink - use dataset_dir in config
 
-# Create training config (full fine-tuning)
+# Create training config (full fine-tuning with FSDP)
 cat > "$LLAMA_FACTORY_DIR/examples/train_full/scienceworld_sft.yaml" << EOF
 ### model
 model_name_or_path: ${MODEL_PATH}
@@ -104,6 +104,18 @@ lr_scheduler_type: cosine
 warmup_ratio: 0.1
 fp16: true
 ddp_timeout: 180000000
+gradient_checkpointing: true
+
+### FSDP configuration
+fsdp: "full_shard auto_wrap"
+fsdp_config:
+  fsdp_offload_params: false
+  fsdp_backward_prefetch: "backward_pre"
+  fsdp_forward_prefetch: false
+  fsdp_use_orig_params: true
+  fsdp_cpu_ram_efficient_loading: true
+  fsdp_sync_module_states: true
+  fsdp_transformer_layer_cls_to_wrap: "Qwen2DecoderLayer"
 
 ### eval
 val_size: 0.1
