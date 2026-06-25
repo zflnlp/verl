@@ -81,7 +81,11 @@ def extract_action(text: str) -> str:
 
 
 def format_prompt(task_description, step_count, history, observation, possible_actions):
-    """Format the prompt for the LLM."""
+    """Format the prompt for the LLM.
+
+    IMPORTANT: This format must match SFT/GRPO training format exactly
+    (from scienceworld_interaction.py and prepare_sft_data.py).
+    """
     history_length = min(3, len(history))
     history_lines = []
     for i, step in enumerate(history[-history_length:]):
@@ -97,14 +101,15 @@ def format_prompt(task_description, step_count, history, observation, possible_a
     else:
         available_actions = "look around, examine <object>, task"
 
+    # IMPORTANT: This format must match scienceworld_interaction.py exactly
     return f"""Your ScienceWorld task is: {task_description}
-Prior to this step, you have already taken {step_count - 1} step(s). Below are the most recent {history_length} observations and the corresponding actions you took: {action_history}
-You are now at step {step_count} and your current observation is: {observation}
+Prior to this step, you have already taken {step_count - 1} step(s).
+Below are the most recent {history_length} observations and the corresponding actions you took:
+{action_history}
+You are now at step {step_count} and your current observation is:
+{observation}
 Your valid actions of the current situation are: [{available_actions}].
-
-Now it's your turn to take an action.
-You should first reason step-by-step about the current situation. This reasoning process MUST be enclosed within <thought> tags.
-Once you've finished your reasoning, you should choose a valid action for the current step and present it within <action> </action> tags."""
+Now it's your turn to take an action. You should first reason step-by-step about the current situation. This reasoning process MUST be enclosed within <thought> tags. Once you've finished your reasoning, you should choose a valid action for the current step and present it within <action> </action> tags."""
 
 
 def run_episode(env, model, tokenizer, task_name, variation, max_steps, simplifications=""):
