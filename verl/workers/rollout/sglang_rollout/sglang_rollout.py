@@ -642,7 +642,11 @@ class SGLangRollout(BaseRollout):
         request_sampling_params.update(kwargs)
 
         if self._tp_rank == 0:
-            loop = asyncio.get_event_loop()
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
             output = loop.run_until_complete(
                 self._engine.async_generate(
                     prompt=None,  # because we have already convert it to prompt token id
@@ -720,7 +724,11 @@ class SGLangRollout(BaseRollout):
 
         # free cache engine
         if self.config.free_cache_engine and self._engine is not None:
-            loop = asyncio.get_event_loop()
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
             loop.run_until_complete(self._engine.flush_cache())
 
         return DataProto(batch=batch, non_tensor_batch=_non_tensor_batch)
@@ -952,7 +960,11 @@ class SGLangRollout(BaseRollout):
                 prompts,
                 n=1 if is_validate else self.config.n,
             )
-            loop = asyncio.get_event_loop()
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
             output_req_list = loop.run_until_complete(
                 asyncio.gather(
                     *[self._async_rollout_a_request(req, do_sample, is_validate, **kwargs) for req in req_list],
@@ -1065,7 +1077,11 @@ class SGLangRollout(BaseRollout):
 
         # free cache engine
         if self.config.free_cache_engine and self._engine is not None and self._tp_rank == 0:
-            loop = asyncio.get_event_loop()
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
             loop.run_until_complete(self._engine.flush_cache())
 
         return DataProto(

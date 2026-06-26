@@ -96,7 +96,11 @@ class MegatronSGLangShardingManager(BaseShardingManager):
                 self.transformer_config,
                 self.layer_name_mapping,
             )
-            loop = asyncio.get_event_loop()
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
             loop.run_until_complete(self.update_weights(per_tensor_param))
             if self.offload_param:
                 offload_megatron_model_to_cpu(self.actor_module)

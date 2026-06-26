@@ -97,7 +97,11 @@ class FSDPSGLangShardingManager(BaseShardingManager):
     def __enter__(self):
         self.timing = {}
         with simple_timer("reshard", self.timing):
-            loop = asyncio.get_event_loop()
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
 
             if self.device_mesh["infer_tp"].get_local_rank() == 0:
                 if self.multi_stage_wake_up:
@@ -138,7 +142,11 @@ class FSDPSGLangShardingManager(BaseShardingManager):
     @GPUMemoryLogger(role="FSDPSGLangShardingManager exit", logger=logger)
     def __exit__(self, exc_type, exc_value, traceback):
         log_gpu_memory_usage("Before SGLang offload in sharding manager", logger=logger)
-        loop = asyncio.get_event_loop()
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
         loop.run_until_complete(self.release_memory())
         log_gpu_memory_usage("After SGLang offload in sharding manager", logger=logger)
 
