@@ -4,15 +4,16 @@
 基于 verl 框架为 ScienceWorld benchmark 构建 GRPO 训练管线，训练 Qwen3-1.7B 模型完成科学实验任务。
 
 ## 当前状态
-**阶段**: SFT cold start 训练完成，准备进行多轮 GRPO 训练
+**阶段**: SFT cold start 完成，验证了 SFT 的有效性，准备用 SFT 模型启动 GRPO 训练
 
 ### 最新进展
 - ✅ 多轮 GRPO 训练流程已验证（过程奖励、奖励传递、tokenization）
-- ✅ SFT 数据准备完成（6,907 条 gold trajectories）
-- ✅ llama-factory 安装完成（v0.9.3，支持 transformers 4.51.1）
-- ✅ SFT 训练完成（loss 1.65→0.005, eval loss 0.0041）
-- ✅ 评估脚本完成（eval_all_tasks.py，对齐论文指标）
+- ✅ SFT 训练完成 v2（FSDP 2卡，loss 0.0249，eval loss 0.0040）
+- ✅ SFT 模型评估完成：学会了 `<action>` 标签和有效动作
+- ✅ 确认 SFT cold start 的价值：跳过格式学习阶段，加速 GRPO 收敛
+- ✅ 评估脚本修复（do_sample=True, temperature=0.4, max_steps=50）
 - ✅ SFT/GRPO/Eval 三方 prompt 格式完全一致
+- ⏳ Python 3.12 不兼容问题已解决（建议用 Python 3.10）
 - ⏳ 准备用 SFT 模型进行多轮 GRPO 训练
 
 ## 源码参考
@@ -35,6 +36,30 @@
 
 ## SFT Cold Start
 
+### SFT 的价值
+SFT cold start 的核心作用是**让模型学会格式和基本动作**，而不直接提升任务完成率：
+
+| 阶段 | 作用 | 分数贡献 |
+|------|------|----------|
+| Base | 不会输出 `<action>` 标签 | 0%（无法执行） |
+| **SFT** | **学会 `<action>` 标签 + 有效动作 + 任务流程** | **0%（会动作但不会适应环境）** |
+| GRPO | 学会根据环境反馈调整策略 | **10-18%（最终分数）** |
+
+**SFT 跳过 RL 的低效探索阶段，让 GRPO 从一开始就在做有意义的探索。**
+
+### SFT 模型评估结果
+
+**Base vs SFT 行为对比**：
+```
+Base:  "I need to figure out the task..." → 没有 <action> 标签 → 0 分
+SFT:   "<action>open door to kitchen</action>" → 有效动作标签 → 0 分（但格式正确！）
+```
+
+**关键发现**：
+- SFT 模型确实学会了 `<action>` 标签和有效动作
+- 但无法根据环境反馈调整（如门已开了还去开）
+- 这验证了 SFT + GRPO 两阶段训练的必要性
+
 ### 数据来源
 - ScienceWorld 官方 gold trajectories（`benchmarks/ScienceWorld/goldpaths/goldpaths-all.zip`）
 - 29 个任务，6,907 个 variations，453,345 步
@@ -50,21 +75,33 @@
 ### SFT 训练配置
 | 参数 | 值 |
 |------|-----|
-| 模型 | Qwen3-1.7B → Qwen3-1.7B-SFT |
+| 模型 | Qwen3-1.7B → Qwen3-1.7B-SFT-v2 |
 | 方法 | 全量微调（full fine-tuning） |
+| GPU | 2×H100（FSDP 分片） |
 | Epochs | 3 |
-| Batch size | 4 |
+| Batch size | 1（per GPU） |
+| Gradient accumulation | 4 |
 | Learning rate | 2e-5 (cosine schedule) |
 | Max seq length | 8,192 |
 | 精度 | fp16 |
 
-### SFT 结果
-| 指标 | 值 |
-|------|-----|
-| Train loss | 0.0411 |
-| Eval loss | 0.0041 |
-| 训练时间 | 47 分钟 |
-| 模型保存 | `/workspace/models/Qwen3-1.7B-SFT` |
+### SFT 训练结果
+| 指标 | v1（4096 token） | **v2（8192 token）** |
+|------|------------------|----------------------|
+| Train loss | 0.0411 | **0.0249** |
+| Eval loss | 0.0041 | **0.0040** |
+| 训练时间 | 47 分钟 | 48 分钟 |
+| 模型保存 | `/workspace/models/Qwen3-1.7B-SFT` | `/workspace/models/Qwen3-1.7B-SFT-v2` |
+
+### 评估脚本修复
+| 问题 | 修复 |
+|------|------|
+| 贪婪解码 → 模型死循环 | `do_sample=True, temperature=0.4`（TCOD 论文 Table 5） |
+| 30 步无法完成任务 | `max_steps=50`（boil 需要 40 步） |
+
+### SFT 模型路径
+- v1: `/workspace/models/Qwen3-1.7B-SFT`（4096 token，已弃用）
+- **v2: `/workspace/models/Qwen3-1.7B-SFT-v2`（8192 token，当前使用）** ⭐
 
 ---
 
