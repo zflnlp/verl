@@ -90,7 +90,7 @@ def main():
         inputs = tokenizer(text, return_tensors="pt").to(model.device)
 
         with torch.no_grad():
-            outputs = model.generate(**inputs, max_new_tokens=512, do_sample=False)
+            outputs = model.generate(**inputs, max_new_tokens=512, do_sample=True, temperature=0.4, top_p=1.0)
 
         response = tokenizer.decode(outputs[0][inputs["input_ids"].shape[-1]:], skip_special_tokens=True)
         action = extract_action(response)
