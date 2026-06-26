@@ -195,7 +195,7 @@ def evaluate_task(env, model, tokenizer, task_name, max_steps, simplifications="
 def main():
     parser = argparse.ArgumentParser(description="Evaluate on all ScienceWorld tasks")
     parser.add_argument("--model_path", type=str, required=True, help="Path to the model")
-    parser.add_argument("--max_steps", type=int, default=30, help="Max steps per episode")
+    parser.add_argument("--max_steps", type=int, default=50, help="Max steps per episode")
     parser.add_argument("--simplifications_preset", type=str, default="easy", help="Simplification preset")
     parser.add_argument("--output_dir", type=str, default=None, help="Output directory")
     parser.add_argument("--tasks", nargs="+", default=None, help="Specific tasks to evaluate (default: all)")
