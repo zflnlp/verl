@@ -9,11 +9,12 @@
 ### 最新进展
 - ✅ 多轮 GRPO 训练流程已验证（过程奖励、奖励传递、tokenization）
 - ✅ SFT 训练完成 v2（FSDP 2卡，loss 0.0249，eval loss 0.0040）
-- ✅ SFT 模型评估完成：学会了 `<action>` 标签和有效动作
+- ✅ SFT vs Zero-shot 对比评估完成
 - ✅ 确认 SFT cold start 的价值：跳过格式学习阶段，加速 GRPO 收敛
 - ✅ 评估脚本修复（do_sample=True, temperature=0.4, max_steps=50）
 - ✅ SFT/GRPO/Eval 三方 prompt 格式完全一致
-- ⏳ Python 3.12 不兼容问题已解决（建议用 Python 3.10）
+- ✅ uvloop 兼容性修复（asyncio event loop 自动创建）
+- ⏳ Python 3.12 → Python 3.10 环境重建中
 - ⏳ 准备用 SFT 模型进行多轮 GRPO 训练
 
 ## 源码参考
@@ -49,16 +50,40 @@ SFT cold start 的核心作用是**让模型学会格式和基本动作**，而�
 
 ### SFT 模型评估结果
 
-**Base vs SFT 行为对比**：
+**Base vs SFT 行为对比（boil 任务，50 steps）**：
+
+| 维度 | Base 模型 | SFT 模型 | 提升 |
+|------|-----------|----------|------|
+| `<action>` 标签输出 | ❌ 不会 | ✅ 正确输出 | ∞ |
+| 动作有效性 | ❌ 随机文本 | ✅ 环境可执行动作 | ∞ |
+| 任务流程理解 | ❌ 无 | ✅ 知道 gold 轨迹步骤 | ∞ |
+| 环境反馈适应 | ❌ 不会 | ❌ 不会（需 GRPO） | — |
+| **Success Rate（所有任务）** | **0%** | **0%** | **格式学会，策略待 GRPO** |
+
+**Base 模型输出**：
 ```
-Base:  "I need to figure out the task..." → 没有 <action> 标签 → 0 分
-SFT:   "<action>open door to kitchen</action>" → 有效动作标签 → 0 分（但格式正确！）
+Step 1: look around → look around → go to greenhouse → look around → ...
+        随机动作，没有 <action> 标签
+```
+
+**SFT 模型输出**：
+```
+Step 1: <action>open door to kitchen</action>  ← 来自 gold 轨迹第 2 步！
+Step 2-10: <action>open door to kitchen</action>  ← 死循环（门已开还去开）
 ```
 
 **关键发现**：
-- SFT 模型确实学会了 `<action>` 标签和有效动作
-- 但无法根据环境反馈调整（如门已开了还去开）
-- 这验证了 SFT + GRPO 两阶段训练的必要性
+1. SFT 模型确实学会了 `<action>` 标签和有效动作（✅ 核心目标达成）
+2. SFT 模型记住了 gold 轨迹的动作序列（"open door to kitchen" 是黄金轨迹第 2 步）
+3. SFT 模型无法根据环境反馈动态调整策略（门已开了还重复去开）
+4. 这验证了 **SFT + GRPO 两阶段训练**的必要性：
+   - SFT：学会"说话"（格式）+ "知道干什么"（任务结构）
+   - GRPO：学会"适应环境"（动态调整策略）
+
+**评估配置**（与 TCOD 论文对齐）：
+- `do_sample=True, temperature=0.4`
+- `max_steps=50`（boil 需 40+ 步完成）
+- 评估所有 30 个任务，官方 test split
 
 ### 数据来源
 - ScienceWorld 官方 gold trajectories（`benchmarks/ScienceWorld/goldpaths/goldpaths-all.zip`）
@@ -185,24 +210,22 @@ Now it's your turn to take an action. You should first reason step-by-step about
 
 ## 待完成工作
 
-### 8. 评估 SFT 模型 ⏳
-```bash
-conda activate scienceworld
-python examples/scienceworld_grpo/eval_all_tasks.py \
-    --model_path /workspace/models/Qwen3-1.7B-SFT \
-    --max_steps 30 --simplifications_preset easy
-```
-
 ### 9. 用 SFT 模型进行多轮 GRPO 训练 ⏳
 ```bash
-MODEL_PATH=/workspace/models/Qwen3-1.7B-SFT \
+conda activate verl_grpo
+MODEL_PATH=/workspace/models/Qwen3-1.7B-SFT-v2 \
 CUDA_VISIBLE_DEVICES=0-7 NGPUS_PER_NODE=8 \
 bash examples/scienceworld_grpo/run_multiturn_training.sh
 ```
 
-### 10. 训练后评估
-- 对比 baseline（1.7B: 0.0, SFT: TBD, GRPO: TBD）
-- 与 TCOD 论文结果对比
+### 10. GRPO 训练后评估
+- 对比 baseline（1.7B: 0.0, SFT: 0%, GRPO: TBD）
+- 与 TCOD 论文结果对比（Qwen3-1.7B TCOD: 11.34%）
+- 报告 Success Rate, Average Score, Average Steps
+
+### 11. 论文结果整理
+- 三阶段训练完整对比：Base → SFT → GRPO
+- 注意：TCOD 论文用 OPD，我们用 GRPO（不同算法）
 
 ---
 
