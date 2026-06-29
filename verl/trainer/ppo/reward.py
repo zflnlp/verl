@@ -202,9 +202,8 @@ def convert_multiturn_rewards_to_rm_scores(data: DataProto) -> DataProto:
 
 
 def compute_reward(data: DataProto, reward_fn):
-def extract_reward(batch: DataProto):
     """
-    Extract reward tensor and extra info from batch data.
+    Compute reward for a batch of data.
     """
     # Convert multi-turn rewards to rm_scores if available
     data = convert_multiturn_rewards_to_rm_scores(data)
@@ -218,6 +217,13 @@ def extract_reward(batch: DataProto):
         reward_tensor = reward_fn(data)
         reward_extra_infos_dict = {}
 
+    return reward_tensor, reward_extra_infos_dict
+
+
+def extract_reward(batch: DataProto):
+    """
+    Extract reward tensor and extra info from batch data.
+    """
     reward_tensor = batch.batch["rm_scores"]
     reward_extra_keys = batch.meta_info.get("reward_extra_keys", [])
     reward_extra_infos_dict = {key: batch.non_tensor_batch[key] for key in reward_extra_keys}
