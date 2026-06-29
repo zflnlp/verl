@@ -31,7 +31,7 @@ SAVE_FREQ=${SAVE_FREQ:-250}
 TEST_FREQ=${TEST_FREQ:-5}
 SEED=${SEED:-42}
 DATA_DIR=${DATA_DIR:-/workspace/data/scienceworld_all}
-MAX_STEPS=${MAX_STEPS:-30}
+MAX_STEPS=${MAX_STEPS:-50}
 PROJECT_NAME=${PROJECT_NAME:-verl_grpo_scienceworld}
 EXPERIMENT_NAME=${EXPERIMENT_NAME:-scienceworld_grpo_$(date +%Y%m%d_%H%M)}
 ###########################
