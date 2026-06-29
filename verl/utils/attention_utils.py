@@ -27,7 +27,32 @@ def _get_attention_functions() -> tuple[Callable, Callable, Callable, Callable]:
     if is_torch_npu_available(check_device=False):
         from verl.utils.npu_flash_attn_utils import index_first_axis, pad_input, rearrange, unpad_input
     else:
-        from flash_attn.bert_padding import index_first_axis, pad_input, rearrange, unpad_input
+        try:
+            from flash_attn.bert_padding import index_first_axis, pad_input, rearrange, unpad_input
+        except ImportError:
+            # Fallback: use transformers' own flash attention padding utils
+            try:
+                from transformers.modeling_flash_attention_utils import (
+                    _index_first_axis as index_first_axis,
+                    _pad_input as pad_input,
+                    _unpacked_flash_attention as rearrange,
+                    _unpad_input as unpad_input,
+                )
+            except ImportError:
+                # Last resort: minimal torch implementations
+                import torch.nn.functional as F
+                def index_first_axis(x, indices):
+                    return x[indices]
+                def pad_input(x, indices, batch, seqlen):
+                    output = x.new_zeros(batch, seqlen, *x.shape[1:])
+                    output[indices] = x
+                    return output
+                def rearrange(x, x_mask):
+                    return x
+                def unpad_input(x, x_mask):
+                    seqlens = x_mask.sum(-1).int()
+                    indices = x_mask.flatten().nonzero().flatten()
+                    return x.flatten(0, 1)[indices], indices, seqlens, None
 
     _index_first_axis, _pad_input, _rearrange, _unpad_input = index_first_axis, pad_input, rearrange, unpad_input
 
