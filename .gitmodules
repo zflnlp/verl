@@ -1,3 +1,9 @@
+<<<<<<< HEAD
 [submodule "llama-factory"]
 	path = llama-factory
 	url = https://github.com/hiyouga/LLaMA-Factory.git
+=======
+[submodule "recipe"]
+	path = recipe
+	url = https://github.com/verl-project/verl-recipe.git
+>>>>>>> main

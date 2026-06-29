@@ -32,6 +32,8 @@ verl is fast with:
    start/quickstart
    start/multinode
    start/ray_debug_tutorial
+   start/more_resources
+   start/agentic_rl
 
 .. toctree::
    :maxdepth: 2
@@ -59,7 +61,9 @@ verl is fast with:
 
    examples/ppo_code_architecture
    examples/gsm8k_example
+   examples/megatron_fsdp_example
    examples/multi_modal_example
+   examples/skypilot_examples
 
 .. toctree::
    :maxdepth: 1
@@ -73,25 +77,37 @@ verl is fast with:
    algo/entropy.md
    algo/opo.md
    algo/baseline.md
+   algo/gpg.md
+   algo/rollout_corr.md
+   algo/rollout_corr_math.md
+   algo/otb.md
+   algo/dppo.md
+   algo/opd.md
 
 .. toctree::
    :maxdepth: 1
    :caption: PPO Trainer and Workers
 
    workers/ray_trainer
-   workers/fsdp_workers
-   workers/megatron_workers
+   workers/model_engine
+   workers/engine_workers
+   workers/automodel_workers
    workers/sglang_worker
+   workers/trtllm_worker
 
 .. toctree::
    :maxdepth: 1
    :caption: Performance Tuning Guide
 
    perf/dpsk.md
+   perf/best_practices
    perf/perf_tuning
+   perf/rollout_kv_offload.md
    README_vllm0.8.md
    perf/device_tuning
+   perf/verl_profiler_system.md
    perf/nsight_profiling.md
+   perf/torch_profiling.md
 
 .. toctree::
    :maxdepth: 1
@@ -102,24 +118,68 @@ verl is fast with:
 
 .. toctree::
    :maxdepth: 1
+   :caption: Async Training
+
+   advance/one_step_off
+   advance/fully_async
+   advance/async-on-policy-distill
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Low Precision
+
+   low_precision/fp8.md
+   low_precision/nvfp4_qat.md
+
+.. toctree::
+   :maxdepth: 1
    :caption: Advanced Features
 
    advance/checkpoint
    advance/rope
+   advance/attention_implementation
    advance/ppo_lora.rst
    sglang_multiturn/multiturn.rst
-   sglang_multiturn/interaction_system.rst
    advance/placement
    advance/dpo_extension
    examples/sandbox_fusion_example
+   advance/rollout_trace.rst
+   advance/rollout_skip.rst
+   advance/agent_loop
+   advance/reward_loop
+   data/transfer_queue.md
+   advance/grafana_prometheus.md
+   advance/mtp.md
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :caption: Hardware Support
 
    amd_tutorial/amd_build_dockerfile_page.rst
    amd_tutorial/amd_vllm_page.rst
-   ascend_tutorial/ascend_quick_start.rst
+   amd_tutorial/amd_quick_start.rst
+   ascend_tutorial/README.md
+   ascend_tutorial/get_start/dockerfile_build_guidance.rst
+   ascend_tutorial/get_start/install_guidance.rst
+   ascend_tutorial/get_start/quick_start.rst
+   ascend_tutorial/feature_support/ascend_backend_features.md
+   ascend_tutorial/feature_support/npu_advance_features.md
+   ascend_tutorial/model_support/model_and_algorithm_support.md
+   ascend_tutorial/model_support/examples/ascend_retool_best_pratice.rst
+   ascend_tutorial/model_support/examples/ascend_sglang_best_practices.rst
+   ascend_tutorial/model_support/examples/dapo_multi_model_optimization_practice.md
+   ascend_tutorial/model_support/examples/gspo_optimization_practice.md
+   ascend_tutorial/dev_guide/model_dev/evaluation.md
+   ascend_tutorial/dev_guide/model_dev/parameter_and_metrics.md
+   ascend_tutorial/dev_guide/model_dev/transfer_to_npu_guide.md
+   ascend_tutorial/dev_guide/precision_analysis/precision_alignment_zh.md
+   ascend_tutorial/dev_guide/precision_analysis/precision_debugger_zh.md
+   ascend_tutorial/dev_guide/performance/ascend_performance_analysis_guide.md
+   ascend_tutorial/dev_guide/performance/perf_tuning_on_ascend.rst
+   ascend_tutorial/dev_guide/performance/ascend_profiling_zh.rst
+   ascend_tutorial/dev_guide/performance/ascend_profiling_en.rst
+   ascend_tutorial/faq/faq.rst
+   ascend_tutorial/contribution_guide/ascend_ci_guide_zh.rst
 
 .. toctree::
    :maxdepth: 1
@@ -130,12 +190,23 @@ verl is fast with:
    api/trainer.rst
    api/utils.rst
 
+.. toctree::
+   :maxdepth: 1
+   :caption: Blog
+
+   blog/v0.7.md
 
 .. toctree::
    :maxdepth: 2
    :caption: FAQ
 
    faq/faq
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Contributing
+
+   contributing/editing-agent-instructions.md
 
 .. toctree::
    :maxdepth: 1
@@ -148,9 +219,9 @@ Contribution
 
 verl is free software; you can redistribute it and/or modify it under the terms
 of the Apache License 2.0. We welcome contributions.
-Join us on `GitHub <https://github.com/volcengine/verl>`_, `Slack <https://join.slack.com/t/verlgroup/shared_invite/zt-2w5p9o4c3-yy0x2Q56s_VlGLsJ93A6vA>`_ and `Wechat <https://raw.githubusercontent.com/eric-haibin-lin/verl-community/refs/heads/main/WeChat.JPG>`_ for discussions.
+Join us on `GitHub <https://github.com/verl-project/verl>`_, `Slack <https://join.slack.com/t/verlgroup/shared_invite/zt-2w5p9o4c3-yy0x2Q56s_VlGLsJ93A6vA>`_ and `Wechat <https://raw.githubusercontent.com/eric-haibin-lin/verl-community/refs/heads/main/WeChat.JPG>`_ for discussions.
 
-Contributions from the community are welcome! Please check out our `project roadmap <https://github.com/volcengine/verl/issues/710>`_ and `good first issues <https://github.com/volcengine/verl/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22good%20first%20issue%22>`_ to see where you can contribute.
+Contributions from the community are welcome! Please check out our `project roadmap <https://github.com/verl-project/verl/issues/710>`_ and `good first issues <https://github.com/verl-project/verl/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22good%20first%20issue%22>`_ to see where you can contribute.
 
 Code Linting and Formatting
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^

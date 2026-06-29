@@ -12,13 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
+<<<<<<< HEAD
 Reward function for WebShop GRPO training.
+=======
+Reward functions for WebShop GRPO training.
+
+This module provides reward computation for WebShop tasks, evaluating
+whether the agent successfully completed the shopping task and how
+well the purchased item matches the instruction.
+>>>>>>> main
 """
 
 import re
 from typing import Any, Optional
 
 
+<<<<<<< HEAD
 def compute_score(
     solution_str: str,
     ground_truth: Any,
@@ -31,10 +40,33 @@ def compute_score(
         solution_str: The agent's final response or action sequence.
         ground_truth: Dictionary containing task information.
         extra_info: Additional information.
+=======
+def compute_webshop_reward(
+    solution_str: str,
+    ground_truth: dict[str, Any],
+    extra_info: Optional[dict[str, Any]] = None,
+) -> float:
+    """Compute reward for WebShop task completion.
+
+    This function evaluates the agent's performance on WebShop by:
+    1. Checking if a purchase was made (from tool rewards)
+    2. Evaluating the match score (from WebShop environment)
+    3. Considering the number of steps taken (efficiency)
+
+    Args:
+        solution_str: The agent's final response or action sequence.
+        ground_truth: Dictionary containing:
+            - task_id: The WebShop task ID
+            - goal: The target product description
+            - category: Product category
+            - attributes: Required product attributes
+        extra_info: Additional information including tool rewards.
+>>>>>>> main
 
     Returns:
         Reward score between 0.0 and 1.0.
     """
+<<<<<<< HEAD
     # Parse ground_truth if it's a string
     if isinstance(ground_truth, str):
         import json
@@ -43,23 +75,44 @@ def compute_score(
         except:
             ground_truth = {}
 
+=======
+>>>>>>> main
     # Extract tool rewards from extra_info if available
     tool_rewards = []
     if extra_info and "tool_rewards" in extra_info:
         tool_rewards = extra_info["tool_rewards"]
 
+<<<<<<< HEAD
     # If we have tool rewards, use them
     if tool_rewards:
+=======
+    # If we have tool rewards (from WebShop environment), use them
+    if tool_rewards:
+        # The last tool reward typically contains the final environment reward
+>>>>>>> main
         env_reward = tool_rewards[-1] if tool_rewards else 0.0
         return float(env_reward)
 
     # Fallback: Parse the solution to check for successful purchase
+<<<<<<< HEAD
     return _parse_solution_reward(solution_str, ground_truth)
 
 
 def _parse_solution_reward(solution_str: str, ground_truth: dict) -> float:
     """Parse the solution string to estimate reward.
 
+=======
+    # This handles cases where tool rewards might not be available
+    return _parse_solution_reward(solution_str, ground_truth)
+
+
+def _parse_solution_reward(solution_str: str, ground_truth: dict[str, Any]) -> float:
+    """Parse the solution string to estimate reward.
+
+    This is a fallback method when tool rewards are not available.
+    It checks for indicators of successful task completion.
+
+>>>>>>> main
     Args:
         solution_str: The agent's response text.
         ground_truth: Expected task attributes.
@@ -79,7 +132,10 @@ def _parse_solution_reward(solution_str: str, ground_truth: dict) -> float:
         "item purchased",
         "bought the item",
         "completed the purchase",
+<<<<<<< HEAD
         "purchase successful",
+=======
+>>>>>>> main
     ]
 
     for indicator in purchase_indicators:
@@ -105,3 +161,86 @@ def _parse_solution_reward(solution_str: str, ground_truth: dict) -> float:
             reward += 0.2 * (matched_attrs / len(attributes))
 
     return min(1.0, reward)
+<<<<<<< HEAD
+=======
+
+
+def compute_webshop_reward_from_trajectory(
+    trajectory: list[dict[str, Any]],
+    ground_truth: dict[str, Any],
+) -> float:
+    """Compute reward from a complete trajectory.
+
+    This function analyzes the entire agent trajectory to compute
+    a more accurate reward score.
+
+    Args:
+        trajectory: List of (action, observation, reward) tuples.
+        ground_truth: Expected task attributes.
+
+    Returns:
+        Final reward score between 0.0 and 1.0.
+    """
+    if not trajectory:
+        return 0.0
+
+    # Get the final step's reward
+    final_step = trajectory[-1]
+    final_reward = final_step.get("reward", 0.0)
+
+    # If we have a valid environment reward, use it
+    if final_reward > 0:
+        return final_reward
+
+    # Otherwise, estimate from the trajectory
+    return _estimate_reward_from_trajectory(trajectory, ground_truth)
+
+
+def _estimate_reward_from_trajectory(
+    trajectory: list[dict[str, Any]],
+    ground_truth: dict[str, Any],
+) -> float:
+    """Estimate reward from trajectory when environment reward is unavailable.
+
+    Args:
+        trajectory: Agent's action-observation history.
+        ground_truth: Expected task attributes.
+
+    Returns:
+        Estimated reward score.
+    """
+    reward = 0.0
+
+    # Check if a buy action was taken
+    actions = [step.get("action", "") for step in trajectory]
+    has_buy = any("buy" in action.lower() for action in actions)
+
+    if has_buy:
+        reward += 0.4
+
+    # Check for search actions (shows intent to find the right product)
+    search_actions = [a for a in actions if "search" in a.lower()]
+    if search_actions:
+        reward += 0.1
+
+    # Check for product inspection (clicking on products)
+    click_actions = [a for a in actions if "click" in a.lower()]
+    if click_actions:
+        reward += 0.1
+
+    # Bonus for efficiency (fewer steps is better)
+    num_steps = len(trajectory)
+    if num_steps <= 5:
+        reward += 0.2
+    elif num_steps <= 10:
+        reward += 0.1
+
+    # Check goal matching in observations
+    if ground_truth:
+        goal = ground_truth.get("goal", "").lower()
+        observations = " ".join(step.get("observation", "") for step in trajectory).lower()
+        if goal and any(word in observations for word in goal.split()[:3]):
+            reward += 0.2
+
+    return min(1.0, reward)
+>>>>>>> main

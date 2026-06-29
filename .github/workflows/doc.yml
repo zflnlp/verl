@@ -74,7 +74,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install the current repository
         run: |
-          pip install -e .[test]
+          pip3 install -r requirements-test.txt
+          pip3 install --no-deps -e .
           pip install -r docs/requirements-docs.txt
 
       - name: Run doc make html
@@ -88,5 +89,13 @@ jobs:
           fi
           if grep -q "WARNING: document isn't included in any toctree" _build/sphinx.log; then
             echo "🚨 Sphinx doc build contained WARNING. Please include newly added docs in index.rst. See _build/sphinx.log for details"
+            exit 1
+          fi
+          if grep -q "WARNING: Inline emphasis" _build/sphinx.log; then
+            echo "🚨 Sphinx doc build contained WARNING. Please check inline emphasis is correct. See _build/sphinx.log for details"
+            exit 1
+          fi
+          if grep -q "WARNING: Definition list ends without a blank line" _build/sphinx.log; then
+            echo "🚨 Sphinx doc build contained WARNING. Please check if the indentation is correct. See _build/sphinx.log for details"
             exit 1
           fi
