@@ -11,6 +11,10 @@
 
 set -xeuo pipefail
 
+# Disable DeepGEMM (not available in this environment)
+export VLLM_USE_DEEP_GEMM=0
+export VLLM_SKIP_WARMUP=1
+
 ########################### config ###########################
 MODEL_PATH=${MODEL_PATH:-/workspace/models/Qwen3-1.7B-SFT-v2}
 NNODES=${NNODES:-1}
