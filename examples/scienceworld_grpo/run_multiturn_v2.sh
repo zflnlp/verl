@@ -14,6 +14,8 @@ set -xeuo pipefail
 # Disable DeepGEMM (not available in this environment)
 export VLLM_USE_DEEP_GEMM=0
 export VLLM_SKIP_WARMUP=1
+# Fix flashinfer version mismatch
+export FLASHINFER_DISABLE_VERSION_CHECK=1
 
 ########################### config ###########################
 MODEL_PATH=${MODEL_PATH:-/workspace/models/Qwen3-1.7B-SFT-v2}
