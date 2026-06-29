@@ -4,18 +4,29 @@
 基于 verl 框架为 ScienceWorld benchmark 构建 GRPO 训练管线，训练 Qwen3-1.7B 模型完成科学实验任务。
 
 ## 当前状态
-**阶段**: SFT cold start 完成，验证了 SFT 的有效性，准备用 SFT 模型启动 GRPO 训练
+**阶段**: SFT cold start + GRPO 训练进行中（vllm 引擎，CUDA 13.1 新机器）
 
 ### 最新进展
-- ✅ 多轮 GRPO 训练流程已验证（过程奖励、奖励传递、tokenization）
-- ✅ SFT 训练完成 v2（FSDP 2卡，loss 0.0249，eval loss 0.0040）
-- ✅ SFT vs Zero-shot 对比评估完成
-- ✅ 确认 SFT cold start 的价值：跳过格式学习阶段，加速 GRPO 收敛
-- ✅ 评估脚本修复（do_sample=True, temperature=0.4, max_steps=50）
-- ✅ SFT/GRPO/Eval 三方 prompt 格式完全一致
-- ✅ uvloop 兼容性修复（asyncio event loop 自动创建）
-- ⏳ Python 3.12 → Python 3.10 环境重建中
-- ⏳ 准备用 SFT 模型进行多轮 GRPO 训练
+- ✅ verl 升级到 main 分支（agent_loop 新架构）
+- ✅ 引擎从 sglang 切换到 vllm（依赖更简单）
+- ✅ CUDA 13.1 兼容性问题全部解决
+- ✅ SFT 训练完成 v2（loss 0.0249，eval loss 0.0040）
+- ✅ SFT + GRPO 训练已启动，初始效果极好
+- 🎉 **GRPO Step 1**: 平均分数 0.459，最大分数 1.000（无 SFT 时仅 0.028/0.250）
+- ⏳ GRPO 训练运行中（56 步，~5.6 分钟/步）
+
+### SFT 版本
+| 分支 | verl 版本 | 引擎 | CUDA | 机器 |
+|------|----------|------|------|------|
+| `webshop-grpo-v0.4.1` | v0.4.1 | sglang | 12.4 | hgx18 (旧) |
+| **`webshop-grpo-main`** | main (0.9.0.dev) | **vllm** | **13.1** | 容器 (新) |
+
+### SFT Cold Start 效果
+| Step 1 指标 | 无 SFT (旧) | 有 SFT (新) | 提升 |
+|------------|------------|------------|------|
+| 平均分数 | 0.028 | **0.459** | 16x |
+| 最大分数 | 0.250 | **1.000** | 4x |
+| 奖励计算 | 342s | **3.4e-5s** | 1e7x |
 
 ## 源码参考
 - ScienceWorld 源码: `benchmarks/ScienceWorld/`
@@ -210,22 +221,38 @@ Now it's your turn to take an action. You should first reason step-by-step about
 
 ## 待完成工作
 
-### 9. 用 SFT 模型进行多轮 GRPO 训练 ⏳
-```bash
-conda activate verl_grpo
-MODEL_PATH=/workspace/models/Qwen3-1.7B-SFT-v2 \
-CUDA_VISIBLE_DEVICES=0-7 NGPUS_PER_NODE=8 \
-bash examples/scienceworld_grpo/run_multiturn_training.sh
-```
+### 12. GRPO 训练收敛 ⏳
+- 当前 Step 1：平均分 0.459，最大分 1.000
+- 观察后续步骤分数变化
+- 已有满分样本，验证 SFT cold start 有效
 
-### 10. GRPO 训练后评估
+### 13. GRPO 训练后评估
 - 对比 baseline（1.7B: 0.0, SFT: 0%, GRPO: TBD）
 - 与 TCOD 论文结果对比（Qwen3-1.7B TCOD: 11.34%）
-- 报告 Success Rate, Average Score, Average Steps
 
-### 11. 论文结果整理
+### 14. 论文结果整理
 - 三阶段训练完整对比：Base → SFT → GRPO
 - 注意：TCOD 论文用 OPD，我们用 GRPO（不同算法）
+
+## 架构升级记录
+
+### verl main 分支关键变化
+| 组件 | v0.4.1 (旧) | main (新) |
+|------|-----------|----------|
+| 多轮交互 | `BaseInteraction` | `AgentLoopBase` |
+| 引擎 | sglang | **vllm** |
+| 交互实现 | `ScienceWorldInteraction` | `ScienceWorldAgentLoop` |
+| 奖励管理 | `convert_multiturn_rewards_to_rm_scores()` | AgentLoop 自动处理 |
+| 配置格式 | `multi_turn.enable=true` | `agent.default_agent_loop` |
+
+### 解决的关键问题
+1. **flash_attn 不兼容** → `attention_utils.py` 添加 torch fallback
+2. **multi_turn undefined** → `ray_trainer.py` 从 meta_info 获取
+3. **Multimodal 错误** → AgentLoop 移除无效参数
+4. **DeepGEMM 缺失** → `VLLM_USE_DEEP_GEMM=0` + `VLLM_SKIP_WARMUP=1`
+5. **flashinfer 版本冲突** → `FLASHINFER_DISABLE_VERSION_CHECK=1`
+6. **merge conflict** → 修复 `.gitmodules`, `reward.py`, `ray_trainer.py`, `version/version`
+7. **CUDA 13.1** → verl main 原生支持
 
 ---
 
