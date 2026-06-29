@@ -51,7 +51,7 @@ echo "=========================================="
 }
 
 # Ensure our agent loop module is importable
-export PYTHONPATH="${PROJECT_DIR}:${PYTHONPATH}"
+export PYTHONPATH="${PROJECT_DIR}:${PYTHONPATH:-}"
 
 python3 -m verl.trainer.main_ppo \
     --config-path="$CONFIG_PATH" \
