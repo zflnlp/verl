@@ -14,6 +14,8 @@
 
 from typing import Callable
 
+import torch
+
 _index_first_axis, _pad_input, _rearrange, _unpad_input = None, None, None, None
 
 
@@ -50,9 +52,14 @@ def _get_attention_functions() -> tuple[Callable, Callable, Callable, Callable]:
                 def rearrange(x, x_mask):
                     return x
                 def unpad_input(x, x_mask):
+                    batch, seqlen = x.shape[:2]
+                    indices = x_mask.flatten().nonzero(as_tuple=True)[0]
+                    cu_seqlens = torch.zeros(batch + 1, dtype=torch.int32, device=x.device)
                     seqlens = x_mask.sum(-1).int()
-                    indices = x_mask.flatten().nonzero().flatten()
-                    return x.flatten(0, 1)[indices], indices, seqlens, None
+                    cu_seqlens[1:] = torch.cumsum(seqlens, dim=0)
+                    max_seqlen = seqlens.max().item()
+                    unpad = x.flatten(0, 1)[indices]
+                    return unpad, indices, cu_seqlens, max_seqlen
 
     _index_first_axis, _pad_input, _rearrange, _unpad_input = index_first_axis, pad_input, rearrange, unpad_input
 
