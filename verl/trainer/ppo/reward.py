@@ -16,13 +16,10 @@ from __future__ import annotations
 import inspect
 import multiprocessing
 from functools import partial
-<<<<<<< HEAD
 
 import ray
 import torch
-=======
 from typing import TYPE_CHECKING, Any, Optional, cast
->>>>>>> main
 
 from verl import DataProto
 from verl.utils.reward_score import get_default_compute_score
@@ -163,7 +160,6 @@ def load_reward_manager(config: DictConfig, tokenizer: Any, **reward_kwargs: Any
     )
 
 
-<<<<<<< HEAD
 def convert_multiturn_rewards_to_rm_scores(data: DataProto) -> DataProto:
     """
     Convert multi-turn rewards from non_tensor_batch["reward_scores"] to batch["rm_scores"].
@@ -206,13 +202,10 @@ def convert_multiturn_rewards_to_rm_scores(data: DataProto) -> DataProto:
 
 
 def compute_reward(data: DataProto, reward_fn):
-=======
 def extract_reward(batch: DataProto):
->>>>>>> main
     """
     Extract reward tensor and extra info from batch data.
     """
-<<<<<<< HEAD
     # Convert multi-turn rewards to rm_scores if available
     data = convert_multiturn_rewards_to_rm_scores(data)
 
@@ -225,9 +218,7 @@ def extract_reward(batch: DataProto):
         reward_tensor = reward_fn(data)
         reward_extra_infos_dict = {}
 
-=======
     reward_tensor = batch.batch["rm_scores"]
     reward_extra_keys = batch.meta_info.get("reward_extra_keys", [])
     reward_extra_infos_dict = {key: batch.non_tensor_batch[key] for key in reward_extra_keys}
->>>>>>> main
     return reward_tensor, reward_extra_infos_dict
