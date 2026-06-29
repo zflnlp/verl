@@ -138,10 +138,6 @@ class ScienceWorldAgentLoop(AgentLoopBase):
                 # Generate model response
                 prompt_ids = await self.apply_chat_template(
                     messages,
-                    images=image_data,
-                    videos=video_data,
-                    audios=audio_data,
-                    mm_processor_kwargs=mm_processor_kwargs,
                 )
 
                 with simple_timer("generate_sequences", metrics):
@@ -149,10 +145,6 @@ class ScienceWorldAgentLoop(AgentLoopBase):
                         request_id=str(uuid4()),
                         prompt_ids=prompt_ids,
                         sampling_params=sampling_params,
-                        image_data=image_data,
-                        video_data=video_data,
-                        audio_data=audio_data,
-                        mm_processor_kwargs=mm_processor_kwargs,
                     )
 
                 response_ids = output.token_ids
