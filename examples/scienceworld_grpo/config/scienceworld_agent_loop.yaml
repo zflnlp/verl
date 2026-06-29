@@ -1,0 +1,7 @@
+# ScienceWorld agent loop configuration
+# This config defines the agent loop for multi-turn ScienceWorld interaction.
+
+scienceworld:
+  max_steps: 30
+  simplifications_preset: easy
+  use_mock: false

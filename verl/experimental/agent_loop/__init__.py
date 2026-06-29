@@ -31,3 +31,4 @@ __all__ = [
     "AgentLoopOutput",
     "get_trajectory_info",
 ]
+from .scienceworld_agent_loop import ScienceWorldAgentLoop
