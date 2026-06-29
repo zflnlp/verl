@@ -233,6 +233,7 @@ def compute_advantage(
     elif adv_estimator == AdvantageEstimator.GRPO:
         # Initialize the mask for GRPO calculation
         grpo_calculation_mask = data.batch["response_mask"]
+        multi_turn = data.meta_info.get("multi_turn", False)
         if multi_turn:
             # If multi-turn, replace the mask with the relevant part of loss_mask
             # Get length from the initial response mask
