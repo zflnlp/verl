@@ -38,6 +38,7 @@ actor_rollout_ref:
     name: vllm
     gpu_memory_utilization: 0.7
     n: 4
+    max_num_batched_tokens: 20480
     multi_turn:
       enable: true
       max_assistant_turns: 30
