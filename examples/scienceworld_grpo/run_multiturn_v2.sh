@@ -82,6 +82,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.multi_turn.enable=true \
     actor_rollout_ref.rollout.multi_turn.max_assistant_turns=${MAX_STEPS} \
     actor_rollout_ref.rollout.agent.default_agent_loop=scienceworld_agent \
+    actor_rollout_ref.rollout.agent.num_workers=2 \
     trainer.project_name=${PROJECT_NAME} \
     trainer.experiment_name=${EXPERIMENT_NAME} \
     trainer.n_gpus_per_node=${NGPUS_PER_NODE} \
