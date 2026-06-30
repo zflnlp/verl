@@ -59,7 +59,7 @@ trainer:
   logger: ['console']
   n_gpus_per_node: 8
   nnodes: 1
-  save_freq: 250
+  save_freq: 10
   test_freq: 5
   total_epochs: 1
   val_before_train: False
