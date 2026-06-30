@@ -7,8 +7,11 @@ ScienceWorld agent loop for multi-turn interaction with ScienceWorld environment
 This agent loop handles text-based interaction with the ScienceWorld environment,
 using <action> tags (not OpenAI function calling). It preserves the prompt format
 from the TCOD paper.
+
+Uses a semaphore to limit concurrent ScienceWorld env usage (prevent Java fd explosion).
 """
 
+import asyncio
 import logging
 import os
 import re
@@ -28,6 +31,9 @@ from verl.workers.rollout.replica import TokenOutput
 
 logger = logging.getLogger(__file__)
 logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
+
+# Limit concurrent ScienceWorld envs to prevent Java fd explosion
+_MAX_CONCURRENT_ENVS = int(os.getenv("SCIENCEWORLD_MAX_CONCURRENT_ENVS", "4"))
 
 
 def _extract_action(text: str) -> str:
@@ -49,6 +55,15 @@ class ScienceWorldAgentLoop(AgentLoopBase):
     4. Executes actions and returns observations
     5. Calculates cumulative process rewards
     """
+
+    # Class-level semaphore to limit concurrent ScienceWorld env usage
+    _env_semaphore = None
+
+    @classmethod
+    def _get_env_semaphore(cls):
+        if cls._env_semaphore is None:
+            cls._env_semaphore = asyncio.Semaphore(_MAX_CONCURRENT_ENVS)
+        return cls._env_semaphore
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -83,7 +98,10 @@ class ScienceWorldAgentLoop(AgentLoopBase):
         task_name = ground_truth.get("task_name", "boil")
         variation = ground_truth.get("variation", 0)
 
-        # Initialize ScienceWorld environment
+        # Acquire semaphore to limit concurrent Java processes
+        semaphore = self._get_env_semaphore()
+        await semaphore.acquire()
+
         env = None
         cumulative_reward = 0.0
         last_score = 0.0
@@ -94,29 +112,22 @@ class ScienceWorldAgentLoop(AgentLoopBase):
 
             env = ScienceWorldEnv()
             env.load(task_name, variation, simplificationStr=self.simplifications_preset)
-        except Exception as e:
-            logger.error(f"Failed to initialize ScienceWorld: {e}")
-            # Return minimal output on error
-            return AgentLoopOutput(
-                prompt_ids=[],
-                response_ids=[],
-                response_mask=[],
-                reward_score=0.0,
-                num_turns=0,
-                metrics=self._init_metrics(),
-            )
 
-        try:
             possible_actions = env.get_possible_actions() if env else []
             current_obs = env.look() if env else ""
+            response_ids = []
+            response_mask = []
 
             for step in range(1, self.max_steps + 1):
-                # Format the current observation as user message
                 task_desc = env.taskdescription() if env else ""
                 history_lines = self._build_history(messages)
                 action_history = "\n".join(history_lines) if history_lines else "(no history)"
 
-                available_actions = ", ".join(possible_actions[:30]) if possible_actions else "look around, examine <object>, task"
+                available_actions = (
+                    ", ".join(possible_actions[:30])
+                    if possible_actions
+                    else "look around, examine <object>, task"
+                )
                 history_length = min(3, len(history_lines) // 2)
 
                 observation_text = (
@@ -132,13 +143,8 @@ class ScienceWorldAgentLoop(AgentLoopBase):
                     f"you should choose a valid action for the current step and present it within <action> </action> tags."
                 )
 
-                # Add observation as user message
                 messages.append({"role": "user", "content": observation_text})
-
-                # Generate model response
-                prompt_ids = await self.apply_chat_template(
-                    messages,
-                )
+                prompt_ids = await self.apply_chat_template(messages)
 
                 with simple_timer("generate_sequences", metrics):
                     output: TokenOutput = await self.server_manager.generate(
@@ -149,33 +155,24 @@ class ScienceWorldAgentLoop(AgentLoopBase):
 
                 response_ids = output.token_ids
                 response_mask = [1] * len(response_ids)
-
-                # Decode the response
                 response_text = self.tokenizer.decode(response_ids, skip_special_tokens=True)
-
-                # Extract action from <action> tags
                 action = _extract_action(response_text)
 
-                # Execute action in environment
                 if env:
                     obs, score, is_done, info = env.step(action)
                     total_score = info.get("score", score)
                     step_reward = total_score - last_score
                     cumulative_reward += step_reward
                     last_score = total_score
-
-                    # Update state for next turn
                     possible_actions = env.get_possible_actions()
                     current_obs = obs
-
-                    # Add model response as assistant message
                     messages.append({"role": "assistant", "content": response_text})
-
                     if is_done:
                         break
                 else:
-                    current_obs = f"Error: Environment not initialized"
-
+                    current_obs = "Error: Environment not initialized"
+        except Exception as e:
+            logger.error(f"ScienceWorld agent loop error: {e}")
         finally:
             if env:
                 try:
@@ -186,8 +183,9 @@ class ScienceWorldAgentLoop(AgentLoopBase):
                     del env
                 except Exception:
                     pass
+            # Release semaphore
+            semaphore.release()
 
-        # Calculate final reward (normalized to 0-1)
         reward_score = max(0.0, min(1.0, cumulative_reward / 100.0))
 
         return AgentLoopOutput(
@@ -210,7 +208,4 @@ class ScienceWorldAgentLoop(AgentLoopBase):
         return history_lines
 
     def _init_metrics(self):
-        """Initialize metrics dictionary."""
-        return {
-            "num_preempted": -1,
-        }
+        return {"num_preempted": -1}
