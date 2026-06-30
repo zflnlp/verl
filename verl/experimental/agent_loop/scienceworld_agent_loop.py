@@ -179,6 +179,10 @@ class ScienceWorldAgentLoop(AgentLoopBase):
         finally:
             if env:
                 try:
+                    env.close()
+                except Exception as e:
+                    logger.debug(f"Error closing env: {e}")
+                try:
                     del env
                 except Exception:
                     pass
