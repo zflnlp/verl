@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Multi-turn GRPO training for ScienceWorld — verl main (latest)
 #
+
+# ScienceWorld needs high file descriptor limit for Java gateway
+# Uses the new agent_loop architecture with custom ScienceWorldAgentLoop.
+# Compatible with CUDA 13.1 on the new machine.
+
 # Uses the new agent_loop architecture with custom ScienceWorldAgentLoop.
 # Compatible with CUDA 13.1 on the new machine.
 #
