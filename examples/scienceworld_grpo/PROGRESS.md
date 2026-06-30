@@ -322,3 +322,71 @@ Now it's your turn to take an action. You should first reason step-by-step about
 4. 运行 SFT: `conda activate llamafactory && CUDA_VISIBLE_DEVICES=X bash examples/scienceworld_grpo/run_sft.sh`
 5. 评估 SFT: `python examples/scienceworld_grpo/eval_all_tasks.py --model_path /workspace/models/Qwen3-1.7B-SFT`
 6. 多轮 GRPO: `MODEL_PATH=/workspace/models/Qwen3-1.7B-SFT bash examples/scienceworld_grpo/run_multiturn_training.sh`
+
+---
+
+## 📋 进度日志
+
+### 2026-06-29 — verl 升级 + SFT cold start GRPO 启动
+
+**背景**：切换到 CUDA 13.1 新机器（8×H200），旧 verl v0.4.1 依赖全面不兼容。
+
+**关键决策**：
+- 升级 verl 到 main 分支（0.9.0.dev），使用新的 AgentLoop 架构
+- 引擎从 sglang 切换到 vllm（依赖更简单）
+- 创建新分支 `webshop-grpo-main`
+
+**创建的核心文件**：
+- `verl/experimental/agent_loop/scienceworld_agent_loop.py` — 新的 AgentLoop
+- `examples/scienceworld_grpo/run_multiturn_v2.sh` — v2 训练脚本
+- `examples/scienceworld_grpo/config/scienceworld_multiturn_v2.yaml` — v2 配置
+
+**解决的依赖问题**：
+1. flash_attn 不兼容 → `attention_utils.py` 添加 torch fallback
+2. `multi_turn` undefined → `ray_trainer.py` 从 meta_info 获取
+3. Multimodal 错误 → AgentLoop 移除无效参数
+4. DeepGEMM 缺失 → `VLLM_USE_DEEP_GEMM=0` + `VLLM_SKIP_WARMUP=1`
+5. flashinfer 版本冲突 → `FLASHINFER_DISABLE_VERSION_CHECK=1`
+6. merge conflict → 修复 4 个文件的冲突标记
+
+**SFT Cold Start GRPO 初始结果**：
+| Step | 平均分 | 最大分 | 说明 |
+|------|--------|--------|------|
+| 1 | 0.459 | 1.000 | SFT cold start 效果显著（无 SFT 仅 0.028） |
+
+### 2026-06-30 — Java fd 爆炸 + 训练稳定性修复
+
+**问题 1：py4j select() fd 溢出**
+
+ScienceWorld 通过 py4j 创建 Java 进程，8 个 AgentLoop workers 同时创建导致 fd 爆炸。
+
+**修复历程**：
+1. 尝试 `ulimit -n 65535` → 无效
+2. 尝试 `agent.num_workers=2` → 无效
+3. 尝试 `agent.num_workers=1` → 过于保守
+4. ✅ **最终方案**：信号量限流 `SCIENCEWORLD_MAX_CONCURRENT_ENVS=4`
+
+**问题 2：max_num_batched_tokens 不足**
+
+prompt(10240) + response(8192) = 18432 > 默认 16384。
+
+**修复**：`max_num_batched_tokens: 20480`
+
+**问题 3：env.close() 不完整**
+
+`del env` 不关闭 Java gateway，改为 `env.close()`。
+
+**训练进展**：
+| Step | 平均分 | 最大分 | 验证分 |
+|------|--------|--------|--------|
+| 1 | 0.459 | 1.000 | - |
+| 4 | 0.750 | 1.000 | - |
+| 5 | 0.745 | 1.000 | 0.750 |
+| 6 | 0.750 | 1.000 | - |
+
+**配置调整**：
+- `save_freq: 250 → 10`（每 10 步保存 checkpoint）
+- `test_freq: 5`（每 5 步验证）
+
+**待做**：
+- GRPO 训练完成 → 评估对比 Base/SFT/GRPO
