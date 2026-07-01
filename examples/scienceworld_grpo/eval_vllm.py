@@ -49,15 +49,25 @@ def run_episode(llm, sampling_params, env, task_name, variation, max_steps=50):
     env.load(task_name, variation, simplificationStr="easy")
     task_desc = env.taskdescription()
 
+    history = []
+
     for step in range(1, max_steps + 1):
         obs = env.look()
         actions = env.get_possible_actions()
 
+        # Build history (last 3 steps) — matches AgentLoop training format
+        history_length = min(3, len(history))
+        history_lines = []
+        for i, h in enumerate(history[-history_length:]):
+            history_lines.append(f"Step {step - history_length + i + 1}: Action: {h['action']}")
+            history_lines.append(f"Observation: {h['obs'][:300]}")
+        action_history = "\n".join(history_lines) if history_lines else "(no history)"
+
         prompt = (
             f"Your ScienceWorld task is: {task_desc}\n"
             f"Prior to this step, you have already taken {step - 1} step(s).\n"
-            f"Below are the most recent 0 observations and the corresponding actions you took:\n"
-            f"(no history)\n"
+            f"Below are the most recent {history_length} observations and the corresponding actions you took:\n"
+            f"{action_history}\n"
             f"You are now at step {step} and your current observation is:\n"
             f"{obs}\n"
             f"Your valid actions of the current situation are: [{', '.join(actions[:30])}].\n"
@@ -70,7 +80,8 @@ def run_episode(llm, sampling_params, env, task_name, variation, max_steps=50):
         text = response[0].outputs[0].text
         action = extract_action(text)
 
-        obs, score, is_done, info = env.step(action)
+        obs2, score, is_done, info = env.step(action)
+        history.append({"action": action, "obs": obs2})
 
         if is_done:
             break
