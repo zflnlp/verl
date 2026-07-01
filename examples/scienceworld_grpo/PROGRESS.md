@@ -390,3 +390,28 @@ prompt(10240) + response(8192) = 18432 > 默认 16384。
 
 **待做**：
 - GRPO 训练完成 → 评估对比 Base/SFT/GRPO
+
+### 2026-07-01 — GRPO 训练突破 + vLLM 评估
+
+**训练进展**（3 epoch SFT cold start）：
+| Step | Score | KL Loss | 说明 |
+|------|-------|---------|------|
+| 1 | 0.459 | 0.001 | SFT 初始化 |
+| 5 | 0.745 | 0.001 | SFT 锁定 |
+| 19 | 0.778 | 0.015 | 开始突破 |
+| 21 | 0.812 | 0.036 | 加速突破 |
+| 26 | 0.898 | 0.063 | 持续突破 |
+| 29 | 0.915 | 0.054 | 进入高分区间 |
+
+**关键发现**：
+- SFT 3 epochs → 模型过拟合，GRPO 前 15 步分数卡在 0.75
+- KL loss 上升（0.001→0.063）驱动分数突破（0.75→0.92）
+- transformers 推理与 vLLM + AgentLoop 推理输出不同
+- 创建 `eval_vllm.py`：用 vLLM 评估，匹配训练环境
+
+**新创建**：
+- `eval_vllm.py`：基于 vLLM 的评估脚本（匹配训练推理路径）
+
+**待做**：
+- 用 vLLM 评估 Step 30 checkpoint 的 Success Rate
+- SFT 1 epoch 训练完成 → 对比 GRPO 效果
