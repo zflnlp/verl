@@ -139,8 +139,8 @@ def run_episode(env, model, tokenizer, task_name, variation, max_steps, simplifi
                 **inputs,
                 max_new_tokens=512,
                 do_sample=True,
-                temperature=0.4,
-                top_p=1.0,
+                temperature=1.0,
+                top_p=0.95,
                 pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id,
             )
 
