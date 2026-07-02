@@ -49,21 +49,23 @@ def run_episode(llm, sampling_params, env, task_name, variation, max_steps=50):
     env.load(task_name, variation, simplificationStr="easy")
     task_desc = env.taskdescription()
 
-    history = []
+    # Multi-turn conversation matching AgentLoop training format
+    actions_history = []
 
     for step in range(1, max_steps + 1):
         obs = env.look()
         actions = env.get_possible_actions()
 
-        # Build history (last 3 steps) — matches AgentLoop training format
-        history_length = min(3, len(history))
+        # Build action history (last 3 steps)
+        history_length = min(3, len(actions_history))
         history_lines = []
-        for i, h in enumerate(history[-history_length:]):
-            history_lines.append(f"Step {step - history_length + i + 1}: Action: {h['action']}")
-            history_lines.append(f"Observation: {h['obs'][:300]}")
+        for i, a in enumerate(actions_history[-history_length:]):
+            history_lines.append(f"Step {step - history_length + i + 1}: Action: {a['action']}")
+            history_lines.append(f"Observation: {a['obs'][:300]}")
         action_history = "\n".join(history_lines) if history_lines else "(no history)"
 
-        prompt = (
+        # Format observation — matches AgentLoop exactly
+        observation_text = (
             f"Your ScienceWorld task is: {task_desc}\n"
             f"Prior to this step, you have already taken {step - 1} step(s).\n"
             f"Below are the most recent {history_length} observations and the corresponding actions you took:\n"
@@ -76,14 +78,22 @@ def run_episode(llm, sampling_params, env, task_name, variation, max_steps=50):
             f"you should choose a valid action for the current step and present it within <action> </action> tags."
         )
 
-        # Use chat template matching training AgentLoop
-        messages = [{"role": "user", "content": prompt}]
+        # Multi-turn conversation: accumulate messages like AgentLoop
+        if step == 1:
+            messages = [{"role": "user", "content": observation_text}]
+        else:
+            # Add previous assistant response as assistant message
+            messages.append({"role": "assistant", "content": last_response_text})
+            # Add new observation as user message
+            messages.append({"role": "user", "content": observation_text})
+
         response = llm.chat(messages, sampling_params)
         text = response[0].outputs[0].text
+        last_response_text = text
         action = extract_action(text)
 
         obs2, score, is_done, info = env.step(action)
-        history.append({"action": action, "obs": obs2})
+        actions_history.append({"action": action, "obs": obs2})
 
         if is_done:
             break
