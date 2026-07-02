@@ -415,3 +415,43 @@ prompt(10240) + response(8192) = 18432 > 默认 16384。
 **待做**：
 - 用 vLLM 评估 Step 30 checkpoint 的 Success Rate
 - SFT 1 epoch 训练完成 → 对比 GRPO 效果
+
+### 2026-07-02 — GRPO 训练完成 + vLLM 评估
+
+**训练完成**（3 epoch SFT + GRPO, 1 epoch, 56 steps）：
+| Step | Train Mean | Val Mean | KL Loss | 状态 |
+|------|-----------|----------|---------|------|
+| 1 | 0.459 | — | 0.001 | SFT 冷启动 |
+| 10 | 0.750 | — | 0.001 | SFT 锁定 |
+| 19 | 0.778 | — | 0.015 | 开始突破 |
+| 26 | 0.898 | — | 0.063 | 加速 |
+| 39 | 0.964 | — | 0.053 | 高分区间 |
+| 56 | 0.630 | **0.993** | — | **训练完成** |
+
+**vLLM 评估脚本**（`eval_vllm.py`）：
+- 使用 vLLM 推理（与训练一致）
+- 多轮对话式交互（完全匹配 AgentLoop）
+- 支持 30 个任务全量评估
+- 输出论文级指标：Avg Score, Success Rate, Avg Steps
+
+**评估结果（部分）**：
+| 模型 | use-thermometer SR | boil SR | 状态 |
+|------|-------------------|---------|------|
+| Base | 待评估 | 待评估 | ⏳ |
+| SFT v2 (3 epoch) | 待评估 | 待评估 | ⏳ |
+| **GRPO Step 56** | **64.4%** | 0% | 🎉 |
+
+**关键发现**：
+- use-thermometer 成功率达到 64.4% — 模型确实学会了任务
+- boil 有 9 个 variation（样本少），得分偏低（Avg 1.3）
+- 训练中 `env.get_score()` 错误返回 `info["score"]` 才是总分
+- `llm.chat()` 多轮对话修复了模型格式输出
+
+**废弃方案**：
+- SFT 1 epoch（v3）：过于保守，放弃
+- SFT 3 epoch（v2）：效果好，确认使用
+
+**下一步**：
+- 全量 30 任务评估 Base / SFT / GRPO 三条线
+- 从 Step 56 继续 3 epoch GRPO 训练
+- 汇总论文对照表（TCOD baseline: Qwen3-1.7B SR 11.34%）
