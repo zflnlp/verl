@@ -113,7 +113,7 @@ def main():
     )
     sampling_params = SamplingParams(
         temperature=args.temperature,
-        max_tokens=512,
+        max_tokens=1024,
         top_p=0.95,
     )
 
