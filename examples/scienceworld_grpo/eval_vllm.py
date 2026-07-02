@@ -76,7 +76,9 @@ def run_episode(llm, sampling_params, env, task_name, variation, max_steps=50):
             f"you should choose a valid action for the current step and present it within <action> </action> tags."
         )
 
-        response = llm.generate(prompt, sampling_params)
+        # Use chat template matching training AgentLoop
+        messages = [{"role": "user", "content": prompt}]
+        response = llm.chat(messages, sampling_params)
         text = response[0].outputs[0].text
         action = extract_action(text)
 
