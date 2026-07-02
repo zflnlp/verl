@@ -94,7 +94,7 @@ def run_episode(llm, sampling_params, env, task_name, variation, max_steps=50):
         action = extract_action(text)
 
         obs2, reward, is_done, info = env.step(action)
-        final_score = info.get("score", 0)  # info["score"] is total, reward is delta
+        final_score = max(0, info.get("score", 0))  # score >= 0
         actions_history.append({"action": action, "obs": obs2})
 
         if is_done:
