@@ -148,6 +148,7 @@ def main():
         for var in test_vars:
             try:
                 score = run_episode(llm, sampling_params, env, task_name, var, args.max_steps)
+                print(f"  [{task_name} var {var}] score={score}")
                 scores.append(score)
                 successes.append(score >= 100)
             except Exception as e:
