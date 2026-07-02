@@ -51,6 +51,7 @@ def run_episode(llm, sampling_params, env, task_name, variation, max_steps=50):
 
     # Multi-turn conversation matching AgentLoop training format
     actions_history = []
+    final_score = 0.0
 
     for step in range(1, max_steps + 1):
         obs = env.look()
@@ -93,12 +94,13 @@ def run_episode(llm, sampling_params, env, task_name, variation, max_steps=50):
         action = extract_action(text)
 
         obs2, score, is_done, info = env.step(action)
+        final_score = info.get("score", score)
         actions_history.append({"action": action, "obs": obs2})
 
         if is_done:
             break
 
-    return env.get_score() if hasattr(env, 'get_score') else info.get("score", 0)
+    return final_score
 
 
 def main():
