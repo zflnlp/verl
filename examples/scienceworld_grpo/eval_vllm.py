@@ -178,7 +178,23 @@ def main():
             "task_metrics": task_metrics, "timestamp": datetime.now().isoformat(),
         }, f, indent=2)
 
-    print(f"Saved to {args.output_dir}/results.json")
+    # Also save as text summary
+    with open(f"{args.output_dir}/summary.txt", "w") as f:
+        f.write(f"Model: {args.model_path}\n")
+        f.write(f"Max steps: {args.max_steps}\n")
+        f.write(f"Timestamp: {datetime.now().isoformat()}\n")
+        f.write(f"{'='*60}\n")
+        f.write(f"OVERALL: Avg Score={overall_avg:.1f}, Success Rate={overall_sr:.1f}%\n")
+        f.write(f"{'='*60}\n\n")
+        f.write(f"{'Task':<40} {'Avg':>6} {'SR':>7} {'Vars':>5}\n")
+        f.write(f"{'-'*60}\n")
+        for task_name in sorted(task_metrics.keys()):
+            m = task_metrics[task_name]
+            f.write(f"{task_name:<40} {m['avg_score']:6.1f} {m['success_rate']:7.1f}% {m['variations']:5d}\n")
+        f.write(f"{'-'*60}\n")
+        f.write(f"{'OVERALL':<40} {overall_avg:6.1f} {overall_sr:7.1f}% {len(all_scores):5d}\n")
+
+    print(f"Saved to {args.output_dir}/results.json and summary.txt")
 
 
 if __name__ == "__main__":
