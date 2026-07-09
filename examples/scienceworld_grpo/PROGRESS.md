@@ -455,3 +455,37 @@ prompt(10240) + response(8192) = 18432 > 默认 16384。
 - 全量 30 任务评估 Base / SFT / GRPO 三条线
 - 从 Step 56 继续 3 epoch GRPO 训练
 - 汇总论文对照表（TCOD baseline: Qwen3-1.7B SR 11.34%）
+
+### 2026-07-03 — 评估结果 + 多 epoch GRPO 发现
+
+**三条线评估（vLLM, 30 任务）**：
+| 模型 | Avg Score | Success Rate | 说明 |
+|------|----------|-------------|------|
+| Zero-shot | 待评估 | 待评估 | ⏳ |
+| **SFT v2** | **38.1** | **22.9%** | ✅ 超过 TCOD 论文 SFT (0%) |
+| GRPO Step 56 | 36.7 | 20.9% | ✅ 某些任务 SR 64% |
+
+**关键发现**：
+- SFT v2（3 epoch cold start）已经很强了，SR 22.9%
+- GRPO 整体略低于 SFT（GRPO 在某些任务进步，其他退步）
+- use-thermometer SR: SFT TBD vs GRPO 64.4%
+- 论文对照：TCOD Qwen3-1.7B SR 0% (SFT), 11.34% (TCOD-B2F)
+
+**多 epoch GRPO 失败**：
+- Epoch 2 尝试继续训练 → 灾难性遗忘
+- Step 143: Score 0.03, PG Loss 0.0, Grad Norm 0.0006
+- **结论：1 epoch GRPO 足够，多 epoch 反效果**
+
+**评估脚本修复历程**（eval_vllm.py）：
+1. 单条消息 → 多轮对话 (llm.chat)
+2. env.get_score() 不存在 → info["score"]
+3. reward delta vs total score 混淆 → 明确使用 info["score"]
+4. 负分问题 → max(0, score)
+5. 输出 summary.txt 保存完整结果
+
+**SFT 版本最终确认**：
+- v2 (8192 seq, 3 epoch) 为最终使用版本
+- v1 (4096 seq) 废弃，v3 (1 epoch) 废弃
+
+**待做**：
+- Zero-shot 评估完成 → 汇总三条线论文结果
